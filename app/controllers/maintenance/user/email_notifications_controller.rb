@@ -17,7 +17,7 @@ module Maintenance
         @user.save
       end
 
-    private
+      private
 
       def render_403
         render plain: "", :status => 403

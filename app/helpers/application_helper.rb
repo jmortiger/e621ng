@@ -180,7 +180,7 @@ module ApplicationHelper
     end
   end
 
-protected
+  protected
   def nav_link_match(controller, url)
     # Static routes must match completely
     return url == request.path if controller == "static"

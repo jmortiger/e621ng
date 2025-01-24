@@ -24,7 +24,7 @@ class ForumPostVotesController < ApplicationController
     end
   end
 
-private
+  private
 
   def load_vote
     @forum_post_vote = @forum_post.votes.where(creator_id: CurrentUser.id).first

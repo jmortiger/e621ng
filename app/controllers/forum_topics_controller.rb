@@ -107,7 +107,7 @@ class ForumTopicsController < ApplicationController
     respond_with(@forum_topic)
   end
 
-private
+  private
   def per_page
     params[:limit] || 40
   end
