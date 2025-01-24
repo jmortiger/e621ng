@@ -6,21 +6,11 @@ class ArtistsController < ApplicationController
   before_action :admin_only, only: %i[destroy]
   before_action :load_artist, only: %i[edit update destroy revert]
 
-  def new
-    @artist = Artist.new(artist_params)
-    respond_with(@artist)
-  end
-
-  def edit
-    ensure_can_edit(CurrentUser.user)
-    respond_with(@artist)
-  end
-
   def index
-    @artists = Artist.includes(:urls).search(search_params).paginate(params[:page], :limit => params[:limit], :search_count => params[:search])
+    @artists = Artist.includes(:urls).search(search_params).paginate(params[:page], limit: params[:limit], search_count: params[:search])
     respond_with(@artists) do |format|
       format.json do
-        render :json => @artists.to_json(:include => [:urls])
+        render json: @artists.to_json(include: [:urls])
         expires_in params[:expiry].to_i.days if params[:expiry]
       end
     end
@@ -45,6 +35,16 @@ class ArtistsController < ApplicationController
     end
     @post_set = PostSets::Post.new(@artist.name, 1, limit: 10)
     respond_with(@artist, methods: [:domains], include: [:urls])
+  end
+
+  def new
+    @artist = Artist.new(artist_params)
+    respond_with(@artist)
+  end
+
+  def edit
+    ensure_can_edit(CurrentUser.user)
+    respond_with(@artist)
   end
 
   def create

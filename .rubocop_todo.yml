@@ -12,7 +12,6 @@
 # SupportedStyles: outdent, indent
 Layout/AccessModifierIndentation:
   Exclude:
-    - 'app/controllers/artists_controller.rb'
     - 'app/controllers/comments_controller.rb'
     - 'app/controllers/forum_post_votes_controller.rb'
     - 'app/controllers/forum_topics_controller.rb'
@@ -1069,7 +1068,6 @@ Rails/ActionControllerFlashBeforeRender:
 # Include: app/controllers/**/*.rb
 Rails/ActionOrder:
   Exclude:
-    - 'app/controllers/artists_controller.rb'
     - 'app/controllers/bans_controller.rb'
     - 'app/controllers/blips_controller.rb'
     - 'app/controllers/bulk_update_requests_controller.rb'
@@ -1601,7 +1599,6 @@ Style/HashSyntax:
   Exclude:
     - 'Gemfile'
     - 'app/controllers/application_controller.rb'
-    - 'app/controllers/artists_controller.rb'
     - 'app/controllers/bans_controller.rb'
     - 'app/controllers/comments_controller.rb'
     - 'app/controllers/favorites_controller.rb'
@@ -1943,7 +1940,6 @@ Style/MutableConstant:
 Style/NegatedIf:
   Exclude:
     - 'app/controllers/application_controller.rb'
-    - 'app/controllers/artists_controller.rb'
     - 'app/controllers/dmails_controller.rb'
     - 'app/controllers/forum_topics_controller.rb'
     - 'app/controllers/pools_controller.rb'
@@ -2577,7 +2573,6 @@ Style/StructInheritance:
 Style/SymbolArray:
   Exclude:
     - 'app/controllers/application_controller.rb'
-    - 'app/controllers/artists_controller.rb'
     - 'app/controllers/bans_controller.rb'
     - 'app/controllers/blips_controller.rb'
     - 'app/controllers/bulk_update_requests_controller.rb'
