@@ -8,7 +8,6 @@ module ApplicationHelper
     cookies[:nmm].present?
   end
 
-
   def diff_list_html(new, old, latest)
     diff = SetDiff.new(new, old, latest)
     render "diff_list", diff: diff
@@ -79,7 +78,7 @@ module ApplicationHelper
     instance = instance_variable_get("@#{instance_name}")
 
     if instance && instance.errors.any?
-      %{<div class="error-messages ui-state-error ui-corner-all"><strong>Error</strong>: #{instance.__send__(:errors).full_messages.join(", ")}</div>}.html_safe
+      %(<div class="error-messages ui-state-error ui-corner-all"><strong>Error</strong>: #{instance.__send__(:errors).full_messages.join(', ')}</div>).html_safe
     else
       ""
     end
@@ -106,19 +105,19 @@ module ApplicationHelper
 
   def external_link_to(url, truncate: nil, strip_scheme: false, link_options: {})
     text = url
-    text = text.gsub(%r!\Ahttps?://!i, "") if strip_scheme
+    text = text.gsub(%r{\Ahttps?://}i, "") if strip_scheme
     text = text.truncate(truncate) if truncate
 
-    if url =~ %r!\Ahttps?://!i
-      link_to text, url, {rel: :nofollow}.merge(link_options)
+    if url =~ %r{\Ahttps?://}i
+      link_to text, url, { rel: :nofollow }.merge(link_options)
     else
       url
     end
   end
 
   def link_to_ip(ip)
-    return '(none)' unless ip
-    link_to ip, moderator_ip_addrs_path(:search => {:ip_addr => ip})
+    return "(none)" unless ip
+    link_to ip, moderator_ip_addrs_path(search: { ip_addr: ip })
   end
 
   def link_to_user(user, include_activation: false)
@@ -181,56 +180,57 @@ module ApplicationHelper
   end
 
   protected
+
   def nav_link_match(controller, url)
     # Static routes must match completely
     return url == request.path if controller == "static"
 
     url =~ case controller
-    when "sessions", "users", "maintenance/user/login_reminders", "maintenance/user/password_resets", "admin/users", "dmails"
-      /^\/(session|users)/
+           when "sessions", "users", "maintenance/user/login_reminders", "maintenance/user/password_resets", "admin/users", "dmails"
+             %r{^/(session|users)}
 
-    when "post_sets"
-      /^\/post_sets/
+           when "post_sets"
+             %r{^/post_sets}
 
-    when "blips"
-      /^\/blips/
+           when "blips"
+             %r{^/blips}
 
-    when "forum_posts"
-      /^\/forum_topics/
+           when "forum_posts"
+             %r{^/forum_topics}
 
-    when "comments"
-      /^\/comments/
+           when "comments"
+             %r{^/comments}
 
-    when "notes", "note_versions"
-      /^\/notes/
+           when "notes", "note_versions"
+             %r{^/notes}
 
-    when "posts", "uploads", "post_versions", "popular", "moderator/post/dashboards", "favorites", "post_favorites"
-      /^\/posts/
+           when "posts", "uploads", "post_versions", "popular", "moderator/post/dashboards", "favorites", "post_favorites"
+             %r{^/posts}
 
-    when "artists", "artist_versions"
-      /^\/artist/
+           when "artists", "artist_versions"
+             %r{^/artist}
 
-    when "tags", "meta_searches", "tag_aliases", "tag_alias_requests", "tag_implications", "tag_implication_requests", "related_tags"
-      /^\/tags/
+           when "tags", "meta_searches", "tag_aliases", "tag_alias_requests", "tag_implications", "tag_implication_requests", "related_tags"
+             %r{^/tags}
 
-    when "pools", "pool_versions"
-      /^\/pools/
+           when "pools", "pool_versions"
+             %r{^/pools}
 
-    when "moderator/dashboards"
-      /^\/moderator/
+           when "moderator/dashboards"
+             %r{^/moderator}
 
-    when "wiki_pages", "wiki_page_versions"
-      /^\/wiki_pages/
+           when "wiki_pages", "wiki_page_versions"
+             %r{^/wiki_pages}
 
-    when "forum_topics", "forum_posts"
-      /^\/forum_topics/
+           when "forum_topics", "forum_posts"
+             %r{^/forum_topics}
 
-    when "help"
-      /^\/help/
+           when "help"
+             %r{^/help}
 
-    # If there is no match activate the site map only
-    else
-      /^#{site_map_path}/
-    end
+           # If there is no match activate the site map only
+           else
+             /^#{site_map_path}/
+           end
   end
 end

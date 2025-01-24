@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require File.expand_path(File.join(File.dirname(__FILE__), '..', '..', 'config', 'environment'))
+require File.expand_path(File.join(File.dirname(__FILE__), "..", "..", "config", "environment"))
 
 UserStatus.find_each do |user_status|
   user_status.update_column(:post_replacement_rejected_count, PostReplacement.rejected.for_user(user_status.user.id).count)
@@ -16,7 +16,7 @@ PostReplacement.where(status: %w[approved original]).group(:post_id)
   original = replacements[1]
 
   # Don't double increment
-  next unless approved.uploader_id_on_approve.blank?
+  next if approved.uploader_id_on_approve.present?
 
   approved.uploader_id_on_approve = original.creator_id
   approved.penalize_uploader_on_approve = true

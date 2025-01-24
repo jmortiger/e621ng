@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class BlipsController < ApplicationController
-  class BlipTooOld < Exception ; end
+  class BlipTooOld < Exception; end
   respond_to :html, :json
   before_action :member_only, only: %i[create new update edit hide]
   before_action :moderator_only, only: %i[unhide warning]
@@ -19,8 +19,12 @@ class BlipsController < ApplicationController
     @blip = Blip.find(params[:id])
     check_visible(@blip)
     @parent = @blip.response_to
-    @children = Blip.visible.where('response_to = ?', @blip.id).paginate(params[:page])
+    @children = Blip.visible.where("response_to = ?", @blip.id).paginate(params[:page])
     respond_with(@blip)
+  end
+
+  def new
+    @blip = Blip.new
   end
 
   def edit
@@ -29,11 +33,22 @@ class BlipsController < ApplicationController
     respond_with(@blip)
   end
 
+  def create
+    @blip = Blip.create(blip_params(:create))
+
+    flash[:notice] = @blip.valid? ? "Blip posted" : @blip.errors.full_messages.join("; ")
+    respond_with(@blip) do |format|
+      format.html do
+        redirect_back(fallback_location: blips_path)
+      end
+    end
+  end
+
   def update
     @blip = Blip.find(params[:id])
     check_edit_privilege(@blip)
     @blip.update(blip_params(:update))
-    flash[:notice] = 'Blip updated'
+    flash[:notice] = "Blip updated"
     respond_with(@blip)
   end
 
@@ -61,24 +76,9 @@ class BlipsController < ApplicationController
     end
   end
 
-  def new
-    @blip = Blip.new
-  end
-
-  def create
-    @blip = Blip.create(blip_params(:create))
-
-    flash[:notice] = @blip.valid? ? "Blip posted" : @blip.errors.full_messages.join("; ")
-    respond_with(@blip) do |format|
-      format.html do
-        redirect_back(fallback_location: blips_path)
-      end
-    end
-  end
-
   def warning
     @blip = Blip.find(params[:id])
-    if params[:record_type] == 'unmark'
+    if params[:record_type] == "unmark"
       @blip.remove_user_warning!
     else
       @blip.user_warned!(params[:record_type], CurrentUser.user)

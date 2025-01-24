@@ -12,7 +12,7 @@ class TagImplicationRequestsController < ApplicationController
     @tag_implication_request.create
 
     if @tag_implication_request.invalid?
-      render :action => "new"
+      render action: "new"
     elsif @tag_implication_request.forum_topic
       redirect_to forum_topic_path(@tag_implication_request.forum_topic)
     else

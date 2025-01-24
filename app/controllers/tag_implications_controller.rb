@@ -1,8 +1,13 @@
 # frozen_string_literal: true
 
 class TagImplicationsController < ApplicationController
-  before_action :admin_only, except: [:index, :show, :destroy]
+  before_action :admin_only, except: %i[index show destroy]
   respond_to :html, :json, :js
+
+  def index
+    @tag_implications = TagImplication.includes(:antecedent_tag, :consequent_tag, :approver).search(search_params).paginate(params[:page], limit: params[:limit])
+    respond_with(@tag_implications)
+  end
 
   def show
     @tag_implication = TagImplication.find(params[:id])
@@ -21,11 +26,6 @@ class TagImplicationsController < ApplicationController
     end
 
     respond_with(@tag_implication)
-  end
-
-  def index
-    @tag_implications = TagImplication.includes(:antecedent_tag, :consequent_tag, :approver).search(search_params).paginate(params[:page], :limit => params[:limit])
-    respond_with(@tag_implications)
   end
 
   def destroy

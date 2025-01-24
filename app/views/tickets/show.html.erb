@@ -94,7 +94,7 @@
 
           <tr>
             <td><span class='title'>Response</span></td>
-            <td class="dtext-container"><%= format_text(!@ticket.response.blank? ? @ticket.response : "No response.") %></td>
+            <td class="dtext-container"><%= format_text(@ticket.response.blank? ? "No response." : @ticket.response) %></td>
           </tr>
         <% end %>
       </table>
@@ -127,7 +127,7 @@
   <%= @ticket.type_title %>
 <% end %>
 
-<% render partial: 'secondary_links' %>
+<% render partial: "secondary_links" %>
 
 <% content_for(:page_title) do %>
   <%= @ticket.type_title %> Ticket

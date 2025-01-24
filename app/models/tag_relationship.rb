@@ -12,16 +12,16 @@ class TagRelationship < ApplicationRecord
   belongs_to :antecedent_tag, class_name: "Tag", foreign_key: "antecedent_name", primary_key: "name", default: -> { Tag.find_or_create_by_name(antecedent_name) }
   belongs_to :consequent_tag, class_name: "Tag", foreign_key: "consequent_name", primary_key: "name", default: -> { Tag.find_or_create_by_name(consequent_name) }
 
-  scope :active, ->{approved}
-  scope :approved, ->{where(status: %w[active processing queued])}
-  scope :deleted, ->{where(status: "deleted")}
-  scope :pending, ->{where(status: "pending")}
-  scope :retired, ->{where(status: "retired")}
-  scope :duplicate_relevant, ->{where(status: %w[active processing queued pending])}
+  scope :active, -> { approved }
+  scope :approved, -> { where(status: %w[active processing queued]) }
+  scope :deleted, -> { where(status: "deleted") }
+  scope :pending, -> { where(status: "pending") }
+  scope :retired, -> { where(status: "retired") }
+  scope :duplicate_relevant, -> { where(status: %w[active processing queued pending]) }
 
-  before_validation :initialize_creator, :on => :create
+  before_validation :initialize_creator, on: :create
   before_validation :normalize_names
-  validates :status, format: { :with => /\A(active|deleted|pending|processing|queued|retired|error: .*)\Z/ }
+  validates :status, format: { with: /\A(active|deleted|pending|processing|queued|retired|error: .*)\Z/ }
   validates :creator_id, :antecedent_name, :consequent_name, presence: true
   validates :creator, presence: { message: "must exist" }, if: -> { creator_id.present? }
   validates :approver, presence: { message: "must exist" }, if: -> { approver_id.present? }

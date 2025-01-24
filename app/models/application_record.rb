@@ -25,7 +25,7 @@ class ApplicationRecord < ActiveRecord::Base
         where("lower(#{qualified_column_for(attr)}) LIKE ? ESCAPE E'\\\\'", value.downcase.to_escaped_for_sql_like)
       end
 
-      def attribute_exact_matches(attribute, value, **options)
+      def attribute_exact_matches(attribute, value, **_options)
         return all unless value.present?
 
         column = qualified_column_for(attribute)
@@ -197,7 +197,7 @@ class ApplicationRecord < ActiveRecord::Base
     protected
 
     def hidden_attributes
-      [:uploader_ip_addr, :updater_ip_addr, :creator_ip_addr, :user_ip_addr, :ip_addr]
+      %i[uploader_ip_addr updater_ip_addr creator_ip_addr user_ip_addr ip_addr]
     end
 
     def method_attributes
@@ -208,19 +208,19 @@ class ApplicationRecord < ActiveRecord::Base
   concerning :ActiveRecordExtensions do
     class_methods do
       def without_timeout
-        connection.execute("SET STATEMENT_TIMEOUT = 0") unless Rails.env == "test"
+        connection.execute("SET STATEMENT_TIMEOUT = 0") unless Rails.env.test?
         yield
       ensure
-        connection.execute("SET STATEMENT_TIMEOUT = #{CurrentUser.user.try(:statement_timeout) || 3_000}") unless Rails.env == "test"
+        connection.execute("SET STATEMENT_TIMEOUT = #{CurrentUser.user.try(:statement_timeout) || 3_000}") unless Rails.env.test?
       end
 
       def with_timeout(n, default_value = nil)
-        connection.execute("SET STATEMENT_TIMEOUT = #{n}") unless Rails.env == "test"
+        connection.execute("SET STATEMENT_TIMEOUT = #{n}") unless Rails.env.test?
         yield
       rescue ::ActiveRecord::StatementInvalid
-        return default_value
+        default_value
       ensure
-        connection.execute("SET STATEMENT_TIMEOUT = #{CurrentUser.user.try(:statement_timeout) || 3_000}") unless Rails.env == "test"
+        connection.execute("SET STATEMENT_TIMEOUT = #{CurrentUser.user.try(:statement_timeout) || 3_000}") unless Rails.env.test?
       end
     end
   end
@@ -235,14 +235,14 @@ class ApplicationRecord < ActiveRecord::Base
         self.versioning_user_column = options[:user_column] || "creator_id"
 
         class_eval do
-          has_many :versions, class_name: 'EditHistory', as: :versionable
+          has_many :versions, class_name: "EditHistory", as: :versionable
           after_update :save_version, if: :should_version_change
 
           define_method :should_version_change do
-            if self.versioning_subject_column
-              return true if send "saved_change_to_#{self.versioning_subject_column}?"
+            if versioning_subject_column && (send "saved_change_to_#{versioning_subject_column}?")
+              return true
             end
-            send "saved_change_to_#{self.versioning_body_column}?"
+            send "saved_change_to_#{versioning_body_column}?"
           end
 
           define_method :save_version do
@@ -253,11 +253,11 @@ class ApplicationRecord < ActiveRecord::Base
                 new = EditHistory.new
                 new.versionable = self
                 new.version = 1
-                new.ip_addr = self.send self.versioning_ip_column
-                new.body = self.send "#{self.versioning_body_column}_before_last_save"
-                new.user_id = self.send self.versioning_user_column
-                new.subject = self.send "#{self.versioning_subject_column}_before_last_save" if self.versioning_subject_column
-                new.created_at = self.created_at
+                new.ip_addr = send versioning_ip_column
+                new.body = send "#{versioning_body_column}_before_last_save"
+                new.user_id = send versioning_user_column
+                new.subject = send "#{versioning_subject_column}_before_last_save" if versioning_subject_column
+                new.created_at = created_at
                 new.save
               end
 
@@ -265,7 +265,7 @@ class ApplicationRecord < ActiveRecord::Base
               version.version = our_next_version + 1
               version.versionable = self
               version.ip_addr = CurrentUser.ip_addr
-              version.body = self.send self.versioning_body_column
+              version.body = send versioning_body_column
               version.user_id = CurrentUser.id
               version.save
             end

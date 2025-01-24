@@ -6,10 +6,10 @@ module BulkUpdateRequestsHelper
 
     case command
     when :create_alias
-      TagAlias.where(antecedent_name: antecedent, consequent_name: consequent, status: %w(active processing queued)).exists?
+      TagAlias.where(antecedent_name: antecedent, consequent_name: consequent, status: %w[active processing queued]).exists?
 
     when :create_implication
-      TagImplication.where(antecedent_name: antecedent, consequent_name: consequent, status: %w(active processing queued)).exists?
+      TagImplication.where(antecedent_name: antecedent, consequent_name: consequent, status: %w[active processing queued]).exists?
 
     when :remove_alias
       TagAlias.where(antecedent_name: antecedent, consequent_name: consequent, status: "deleted").exists? || !TagAlias.where(antecedent_name: antecedent, consequent_name: consequent).exists?
@@ -18,7 +18,8 @@ module BulkUpdateRequestsHelper
       TagImplication.where(antecedent_name: antecedent, consequent_name: consequent, status: "deleted").exists? || !TagImplication.where(antecedent_name: antecedent, consequent_name: consequent).exists?
 
     when :change_category
-      tag, category = antecedent, consequent
+      tag = antecedent
+      category = consequent
       Tag.where(name: tag, category: Tag.categories.value_for(category)).exists?
 
     else
@@ -42,7 +43,7 @@ module BulkUpdateRequestsHelper
   end
 
   def collect_script_tags(tokenized)
-    names = ::Set.new()
+    names = ::Set.new
     tokenized.each do |cmd, arg1, arg2|
       case cmd
       when :create_alias, :create_implication, :remove_alias, :remove_implication
@@ -84,11 +85,11 @@ module BulkUpdateRequestsHelper
           btag = "[color=green][s]"
           etag = "[/s][/color]"
         elsif with_decorations && failed?(cmd, arg1, arg2)
-          btag = '[color=red][s]'
+          btag = "[color=red][s]"
           etag = "[/s][/color]"
         end
         links = script_tag_links(cmd, arg1, arg2, script_tags)
-        "#{btag}#{cmd.to_s.tr("_", " ")} #{links}#{arg3 if bur.is_pending?}#{etag}"
+        "#{btag}#{cmd.to_s.tr('_', ' ')} #{links}#{arg3 if bur.is_pending?}#{etag}"
       end.join("\n")
     rescue BulkUpdateRequestImporter::Error
       "!!!!!!Invalid Script!!!!!!"

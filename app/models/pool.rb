@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Pool < ApplicationRecord
-  class RevertError < Exception;
+  class RevertError < Exception
   end
 
   array_attribute :post_ids, parse: %r{(?:https://(?:e621|e926)\.net/posts/)?(\d+)}i, cast: :to_i
@@ -15,16 +15,16 @@ class Pool < ApplicationRecord
   validate :user_not_limited, on: :update, if: :limited_attribute_changed?
   validate :user_not_posts_limited, on: :update, if: :post_ids_changed?
   validate :validate_name, if: :name_changed?
-  validates :category, inclusion: { :in => %w(series collection) }
+  validates :category, inclusion: { in: %w[series collection] }
   validate :updater_can_change_category, on: :update
   validate :updater_can_remove_posts
   validate :validate_number_of_posts
   before_validation :normalize_post_ids
   before_validation :normalize_name
-  after_save :create_version
-  after_save :synchronize, if: :saved_change_to_post_ids?
   after_create :synchronize!
   before_destroy :remove_all_posts
+  after_save :create_version
+  after_save :synchronize, if: :saved_change_to_post_ids?
 
   attr_accessor :skip_sync
 
@@ -139,8 +139,6 @@ class Pool < ApplicationRecord
       where("pools.id = ?", name.to_i).first
     elsif name
       where("lower(pools.name) = ?", normalize_name(name).downcase).first
-    else
-      nil
     end
   end
 
@@ -188,7 +186,7 @@ class Pool < ApplicationRecord
   end
 
   def create_mod_action_for_delete
-    ModAction.log(:pool_delete, {pool_id: id, pool_name: name, user_id: creator_id})
+    ModAction.log(:pool_delete, { pool_id: id, pool_name: name, user_id: creator_id })
   end
 
   def validate_number_of_posts
@@ -224,7 +222,7 @@ class Pool < ApplicationRecord
     return if id.nil?
     return if contains?(id)
 
-    self.post_ids << id
+    post_ids << id
   end
 
   def remove!(post)
@@ -319,7 +317,7 @@ class Pool < ApplicationRecord
   end
 
   def method_attributes
-    super + [:creator_name, :post_count]
+    super + %i[creator_name post_count]
   end
 
   def category_changeable_by?(user)
@@ -344,7 +342,7 @@ class Pool < ApplicationRecord
       errors.add(:name, "cannot contain only digits")
     when /,/
       errors.add(:name, "cannot contain commas")
-    when /(__|\-\-|  )/
+    when /(__|--|  )/
       errors.add(:name, "cannot contain consecutive underscores, hyphens or spaces")
     end
   end

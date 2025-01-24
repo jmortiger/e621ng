@@ -14,4 +14,3 @@ class UserRevertsController < ApplicationController
     redirect_to(user_path(user.id))
   end
 end
-

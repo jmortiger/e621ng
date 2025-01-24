@@ -32,10 +32,10 @@ class BulkUpdateRequestImporterTest < ActiveSupport::TestCase
         create(:post, tag_string: "eee")
 
         @script = "create alias aaa -> 000\n" +
-          "create implication bbb -> 111\n" +
-          "remove alias ccc -> 222\n" +
-          "remove implication ddd -> 333\n" +
-          "mass update eee -> 444\n"
+                  "create implication bbb -> 111\n" +
+                  "remove alias ccc -> 222\n" +
+                  "remove implication ddd -> 333\n" +
+                  "mass update eee -> 444\n"
       end
 
       subject { BulkUpdateRequestImporter.new(@script, nil) }
@@ -99,10 +99,10 @@ class BulkUpdateRequestImporterTest < ActiveSupport::TestCase
       setup do
         @ta = create(:tag_alias, antecedent_name: "a", consequent_name: "b", status: "active")
         @ti = create(:tag_implication, antecedent_name: "c", consequent_name: "d", status: "active")
-        @script = %{
+        @script = %(
           remove alias a -> b
           remove implication c -> d
-        }
+        )
         @importer = BulkUpdateRequestImporter.new(@script, nil)
       end
 

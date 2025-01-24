@@ -11,7 +11,11 @@ module Sources
         end
         @url = url
 
-        @parsed_url = Addressable::URI.heuristic_parse(url) rescue nil
+        @parsed_url = begin
+          Addressable::URI.heuristic_parse(url)
+        rescue StandardError
+          nil
+        end
 
         parse if @parsed_url.present?
       end
@@ -30,7 +34,6 @@ module Sources
       end
 
       def parse
-
       end
 
       def remove_duplicates(sources)

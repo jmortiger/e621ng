@@ -4,7 +4,7 @@
 
     <p>Do you wish to stop receiving all email notifications?</p>
 
-    <%= form_tag(maintenance_user_email_notification_path, :method => "delete") do %>
+    <%= form_tag(maintenance_user_email_notification_path, method: "delete") do %>
       <%= hidden_field_tag "sig", params[:sig] %>
       <%= hidden_field_tag "user_id", params[:user_id] %>
       <%= submit_tag "Yes" %>

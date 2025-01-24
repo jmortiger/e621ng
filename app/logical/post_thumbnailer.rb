@@ -31,15 +31,15 @@ module PostThumbnailer
 
   def generate_video_crop_for(video, width)
     vp = Tempfile.new(["video-preview", ".jpg"], binmode: true)
-    video.screenshot(vp.path, {:seek_time => 0, :resolution => "#{video.width}x#{video.height}"})
+    video.screenshot(vp.path, { seek_time: 0, resolution: "#{video.width}x#{video.height}" })
     crop = DanbooruImageResizer.crop(vp, width, width, 87)
     vp.close
-    return crop
+    crop
   end
 
   def generate_video_preview_for(video, width)
     output_file = Tempfile.new(["video-preview", ".jpg"], binmode: true)
-    stdout, stderr, status = Open3.capture3(Danbooru.config.ffmpeg_path, '-y', '-i', video, '-vf', "thumbnail,scale=#{width}:-1", '-frames:v', '1', output_file.path)
+    stdout, stderr, status = Open3.capture3(Danbooru.config.ffmpeg_path, "-y", "-i", video, "-vf", "thumbnail,scale=#{width}:-1", "-frames:v", "1", output_file.path)
 
     unless status == 0
       Rails.logger.warn("[FFMPEG PREVIEW STDOUT] #{stdout.chomp!}")
@@ -51,7 +51,7 @@ module PostThumbnailer
 
   def generate_video_sample_for(video)
     output_file = Tempfile.new(["video-sample", ".jpg"], binmode: true)
-    stdout, stderr, status = Open3.capture3(Danbooru.config.ffmpeg_path, '-y', '-i', video, '-vf', 'thumbnail', '-frames:v', '1', output_file.path)
+    stdout, stderr, status = Open3.capture3(Danbooru.config.ffmpeg_path, "-y", "-i", video, "-vf", "thumbnail", "-frames:v", "1", output_file.path)
 
     unless status == 0
       Rails.logger.warn("[FFMPEG SAMPLE STDOUT] #{stdout.chomp!}")

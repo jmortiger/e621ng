@@ -4,7 +4,7 @@
   <% else %>
     <% blips.each do |blip| %>
       <% next unless blip.can_view?(current_user) %>
-      <div class="response-list"><%= render partial: "blip/blip", locals: {blip: blip} %></div>
+      <div class="response-list"><%= render partial: "blip/blip", locals: { blip: blip } %></div>
     <% end %>
   <% end %>
 </div>

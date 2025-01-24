@@ -1,6 +1,6 @@
 <div id="c-pools">
   <div id="a-index">
-    <%= render partial: "search", locals: {path: pools_path} %>
+    <%= render partial: "search", locals: { path: pools_path } %>
     <h2>Pools</h2>
     <table class="striped">
       <thead>
@@ -20,7 +20,7 @@
               <%= link_to pool.pretty_name, pool_path(pool) %>
 
               <% if pool.last_page > 1 %>
-                <%= link_to "page #{pool.last_page}", pool_path(pool, :page => pool.last_page), :class => "last-page" %>
+                <%= link_to "page #{pool.last_page}", pool_path(pool, page: pool.last_page), class: "last-page" %>
               <% end %>
             </td>
             <td>

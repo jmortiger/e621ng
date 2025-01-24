@@ -7,7 +7,7 @@ class ApiKey < ApplicationRecord
   has_secure_token :key
 
   def self.generate!(user)
-    create(:user_id => user.id)
+    create(user_id: user.id)
   end
 
   def regenerate!

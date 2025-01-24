@@ -132,7 +132,7 @@ class TagImplication < TagRelationship
       rescue Exception => e
         if tries < 5 && !Rails.env.test?
           tries += 1
-          sleep 2 ** tries
+          sleep 2**tries
           retry
         end
 
@@ -144,14 +144,13 @@ class TagImplication < TagRelationship
     def create_undo_information
       Post.without_timeout do
         Post.sql_raw_tag_match(antecedent_name).find_in_batches do |posts|
-          post_info = Hash.new
+          post_info = {}
           posts.each do |p|
             post_info[p.id] = p.tag_string
           end
           tag_rel_undos.create!(undo_data: post_info)
         end
       end
-
     end
 
     def approve!(approver: CurrentUser.user, update_topic: true)
@@ -168,36 +167,35 @@ class TagImplication < TagRelationship
     end
 
     def create_mod_action
-      implication = %Q("tag implication ##{id}":[#{Rails.application.routes.url_helpers.tag_implication_path(self)}]: [[#{antecedent_name}]] -> [[#{consequent_name}]])
+      implication = %("tag implication ##{id}":[#{Rails.application.routes.url_helpers.tag_implication_path(self)}]: [[#{antecedent_name}]] -> [[#{consequent_name}]])
 
       if previously_new_record?
-        ModAction.log(:tag_implication_create, {implication_id: id, implication_desc: implication})
+        ModAction.log(:tag_implication_create, { implication_id: id, implication_desc: implication })
       else
         # format the changes hash more nicely.
         change_desc = saved_changes.except(:updated_at).map do |attribute, values|
-          old, new = values[0], values[1]
+          old = values[0]
+          new = values[1]
           if old.nil?
-            %Q(set #{attribute} to "#{new}")
+            %(set #{attribute} to "#{new}")
           else
-            %Q(changed #{attribute} from "#{old}" to "#{new}")
+            %(changed #{attribute} from "#{old}" to "#{new}")
           end
         end.join(", ")
 
-        ModAction.log(:tag_implication_update, {implication_id: id, implication_desc: implication, change_desc: change_desc})
+        ModAction.log(:tag_implication_update, { implication_id: id, implication_desc: implication, change_desc: change_desc })
       end
     end
 
     def forum_updater
       post = if forum_topic
-        forum_post || forum_topic.posts.where("body like ?", TagImplicationRequest.command_string(antecedent_name, consequent_name, id) + "%").last
-      else
-        nil
-      end
+               forum_post || forum_topic.posts.where("body like ?", TagImplicationRequest.command_string(antecedent_name, consequent_name, id) + "%").last
+             end
       ForumUpdater.new(
         forum_topic,
         forum_post: post,
         expected_title: TagImplicationRequest.topic_title(antecedent_name, consequent_name),
-        skip_update: !TagRelationship::SUPPORT_HARD_CODED
+        skip_update: !TagRelationship::SUPPORT_HARD_CODED,
       )
     end
 

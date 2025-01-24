@@ -7,29 +7,29 @@ class ForumPost < ApplicationRecord
   belongs_to_creator
   belongs_to_updater
   user_status_counter :forum_post_count
-  belongs_to :topic, :class_name => "ForumTopic"
+  belongs_to :topic, class_name: "ForumTopic"
   belongs_to :warning_user, class_name: "User", optional: true
   has_many :votes, class_name: "ForumPostVote"
   has_one :tag_alias
   has_one :tag_implication
   has_one :bulk_update_request
-  before_validation :initialize_is_hidden, :on => :create
+  before_validation :initialize_is_hidden, on: :create
   after_create :update_topic_updated_at_on_create
+  before_destroy :validate_topic_is_unlocked
   after_destroy :update_topic_updated_at_on_destroy
   normalizes :body, with: ->(body) { body.gsub("\r\n", "\n") }
   validates :body, :creator_id, presence: true
   validates :body, length: { minimum: 1, maximum: Danbooru.config.forum_post_max_size }
   validate :validate_topic_is_unlocked
   validate :topic_id_not_invalid
-  validate :topic_is_not_restricted, :on => :create
+  validate :topic_is_not_restricted, on: :create
   validate :category_allows_replies, on: :create
   validate :validate_creator_is_not_limited, on: :create
-  before_destroy :validate_topic_is_unlocked
   after_save :delete_topic_if_original_post
-  after_update(:if => ->(rec) { !rec.saved_change_to_is_hidden? && rec.updater_id != rec.creator_id }) do |rec|
+  after_update(if: ->(rec) { !rec.saved_change_to_is_hidden? && rec.updater_id != rec.creator_id }) do |rec|
     ModAction.log(:forum_post_update, { forum_post_id: rec.id, forum_topic_id: rec.topic_id, user_id: rec.creator_id })
   end
-  after_update(:if => ->(rec) { rec.saved_change_to_is_hidden? }) do |rec|
+  after_update(if: ->(rec) { rec.saved_change_to_is_hidden? }) do |rec|
     ModAction.log(rec.is_hidden ? :forum_post_hide : :forum_post_unhide, { forum_post_id: rec.id, forum_topic_id: rec.topic_id, user_id: rec.creator_id })
   end
   after_destroy do |rec|
@@ -122,21 +122,21 @@ class ForumPost < ApplicationRecord
   def topic_id_not_invalid
     if topic_id && !topic
       errors.add(:base, "Topic ID is invalid")
-      return false
+      false
     end
   end
 
   def topic_is_not_restricted
     if topic && !topic.visible?(creator)
       errors.add(:topic, "is restricted")
-      return false
+      false
     end
   end
 
   def category_allows_replies
     if topic && !topic.can_reply?(creator)
       errors.add(:topic, "does not allow replies")
-      return false
+      false
     end
   end
 
@@ -163,7 +163,7 @@ class ForumPost < ApplicationRecord
   def update_topic_updated_at_on_create
     if topic
       # need to do this to bypass the topic's original post from getting touched
-      ForumTopic.where(:id => topic.id).update_all(["updater_id = ?, response_count = response_count + 1, updated_at = ?", CurrentUser.id, Time.now])
+      ForumTopic.where(id: topic.id).update_all(["updater_id = ?, response_count = response_count + 1, updated_at = ?", CurrentUser.id, Time.now])
       topic.response_count += 1
     end
   end
@@ -179,19 +179,19 @@ class ForumPost < ApplicationRecord
   end
 
   def update_topic_updated_at_on_hide
-    max = ForumPost.where(:topic_id => topic.id, :is_hidden => false).order("updated_at desc").first
+    max = ForumPost.where(topic_id: topic.id, is_hidden: false).order("updated_at desc").first
     if max
-      ForumTopic.where(:id => topic.id).update_all(["updated_at = ?, updater_id = ?", max.updated_at, max.updater_id])
+      ForumTopic.where(id: topic.id).update_all(["updated_at = ?, updater_id = ?", max.updated_at, max.updater_id])
     end
   end
 
   def update_topic_updated_at_on_destroy
-    max = ForumPost.where(:topic_id => topic.id, :is_hidden => false).order("updated_at desc").first
+    max = ForumPost.where(topic_id: topic.id, is_hidden: false).order("updated_at desc").first
     if max
-      ForumTopic.where(:id => topic.id).update_all(["response_count = response_count - 1, updated_at = ?, updater_id = ?", max.updated_at, max.updater_id])
+      ForumTopic.where(id: topic.id).update_all(["response_count = response_count - 1, updated_at = ?, updater_id = ?", max.updated_at, max.updater_id])
       topic.response_count -= 1
     else
-      ForumTopic.where(:id => topic.id).update_all("response_count = response_count - 1")
+      ForumTopic.where(id: topic.id).update_all("response_count = response_count - 1")
       topic.response_count -= 1
     end
   end
@@ -206,7 +206,7 @@ class ForumPost < ApplicationRecord
 
   def is_original_post?(original_post_id = nil)
     if original_post_id
-      return id == original_post_id
+      id == original_post_id
     else
       ForumPost.exists?(["id = ? and id = (select _.id from forum_posts _ where _.topic_id = ? order by _.id asc limit 1)", id, topic_id])
     end

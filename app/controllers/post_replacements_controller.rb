@@ -2,14 +2,21 @@
 
 class PostReplacementsController < ApplicationController
   respond_to :html, :json
-  before_action :member_only, only: [:create, :new]
-  before_action :approver_only, only: [:approve, :reject, :promote, :toggle_penalize]
+  before_action :member_only, only: %i[create new]
+  before_action :approver_only, only: %i[approve reject promote toggle_penalize]
   before_action :admin_only, only: [:destroy]
-  before_action :ensure_uploads_enabled, only: [:new, :create]
+  before_action :ensure_uploads_enabled, only: %i[new create]
 
   content_security_policy only: [:new] do |p|
     p.img_src :self, :data, :blob, "*"
     p.media_src :self, :data, :blob, "*"
+  end
+
+  def index
+    params[:search][:post_id] = params.delete(:post_id) if params.key?(:post_id)
+    @post_replacements = PostReplacement.includes(:post).visible(CurrentUser.user).search(search_params).paginate(params[:page], limit: params[:limit])
+
+    respond_with(@post_replacements)
   end
 
   def new
@@ -87,13 +94,6 @@ class PostReplacementsController < ApplicationController
     else
       respond_with(@upload.post)
     end
-  end
-
-  def index
-    params[:search][:post_id] = params.delete(:post_id) if params.key?(:post_id)
-    @post_replacements = PostReplacement.includes(:post).visible(CurrentUser.user).search(search_params).paginate(params[:page], limit: params[:limit])
-
-    respond_with(@post_replacements)
   end
 
   private

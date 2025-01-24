@@ -14,7 +14,7 @@
       Messages: <%= disapprovals.map(&:message).select(&:present?).map { |msg| format_text(msg, inline: true) }.to_sentence.html_safe %>.
     <% end %>
 
-    <% @our_disapproval = disapprovals.select {|x| x.user_id == CurrentUser.id }.first %>
+    <% @our_disapproval = disapprovals.select { |x| x.user_id == CurrentUser.id }.first %>
     <% if @our_disapproval.present? %>
       <div>
         You are currently disapproving of this post for the following reason: <strong><%= @our_disapproval.reason %></strong>

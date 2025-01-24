@@ -2,7 +2,7 @@
 
 class UploadWhitelistsController < ApplicationController
   respond_to :html, :json, :js
-  before_action :admin_only, only: [:new, :create, :edit, :update, :destroy]
+  before_action :admin_only, only: %i[new create edit update destroy]
   before_action :load_whitelist, only: %i[edit update destroy]
 
   def index
@@ -39,17 +39,17 @@ class UploadWhitelistsController < ApplicationController
       url_parsed = Addressable::URI.heuristic_parse(params[:url])
       allowed, reason = UploadWhitelist.is_whitelisted?(url_parsed)
       @whitelist = {
-          url: params[:url],
-          domain: url_parsed.domain,
-          is_allowed: allowed,
-          reason: reason
+        url: params[:url],
+        domain: url_parsed.domain,
+        is_allowed: allowed,
+        reason: reason,
       }
     rescue Addressable::URI::InvalidURIError => e
       @whitelist = {
-          url: params[:url],
-          domain: 'invalid domain',
-          is_allowed: false,
-          reason: 'invalid domain'
+        url: params[:url],
+        domain: "invalid domain",
+        is_allowed: false,
+        reason: "invalid domain",
       }
     end
     respond_with(@whitelist) do |format|

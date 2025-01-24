@@ -21,7 +21,7 @@
 
     <p>You must enter your password to delete your account. Accounts cannot be deleted until they have existed for at least one week.</p>
 
-    <%= form_tag(maintenance_user_deletion_path, :method => :delete, :class => "simple_form") do %>
+    <%= form_tag(maintenance_user_deletion_path, method: :delete, class: "simple_form") do %>
       <div class="input">
         <label>Password</label>
         <%= password_field_tag :password %>

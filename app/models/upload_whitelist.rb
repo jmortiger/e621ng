@@ -8,21 +8,21 @@ class UploadWhitelist < ApplicationRecord
   validates :pattern, uniqueness: true
   validates :pattern, format: { with: %r{\A[a-zA-Z0-9.%:_\-*\/?&]+\z} }
   after_create do |rec|
-    ModAction.log(:upload_whitelist_create, {pattern: rec.pattern, note: rec.note, hidden: rec.hidden})
+    ModAction.log(:upload_whitelist_create, { pattern: rec.pattern, note: rec.note, hidden: rec.hidden })
   end
   after_save do |rec|
-    ModAction.log(:upload_whitelist_update, {pattern: rec.pattern, note: rec.note, old_pattern: rec.pattern_before_last_save, hidden: rec.hidden})
+    ModAction.log(:upload_whitelist_update, { pattern: rec.pattern, note: rec.note, old_pattern: rec.pattern_before_last_save, hidden: rec.hidden })
   end
   after_destroy do |rec|
-    ModAction.log(:upload_whitelist_delete, {pattern: rec.pattern, note: rec.note, hidden: rec.hidden})
+    ModAction.log(:upload_whitelist_delete, { pattern: rec.pattern, note: rec.note, hidden: rec.hidden })
   end
 
   def clean_pattern
-    self.pattern = self.pattern.downcase.tr('%', '*')
+    self.pattern = pattern.downcase.tr("%", "*")
   end
 
   def clear_cache
-    Cache.delete('upload_whitelist')
+    Cache.delete("upload_whitelist")
   end
 
   module SearchMethods
@@ -62,7 +62,7 @@ class UploadWhitelist < ApplicationRecord
     end
 
     if Danbooru.config.bypass_upload_whitelist?(CurrentUser)
-      return [true, 'bypassed']
+      return [true, "bypassed"]
     end
 
     entries.each do |x|

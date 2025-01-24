@@ -11,7 +11,7 @@
         <% @blips.each do |blip| %>
           <% if blip.visible_to?(CurrentUser.user) %>
             <div class="response-list">
-              <%= render partial: "blips/partials/show/blip", locals: {blip: blip} %>
+              <%= render partial: "blips/partials/show/blip", locals: { blip: blip } %>
             </div>
           <% end %>
         <% end %>

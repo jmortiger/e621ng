@@ -11,9 +11,9 @@ class ModActionDecorator < ApplicationDecorator
     vals = object.values
     return "" if vals.nil?
 
-    if vals['user_id']
+    if vals["user_id"]
       user = "\"#{User.id_to_name(vals['user_id'])}\":/users/#{vals['user_id']}"
-    elsif vals['username']
+    elsif vals["username"]
       user = "\"#{vals['username']}\":/users/?name=#{vals['username']}"
     end
 
@@ -223,13 +223,13 @@ class ModActionDecorator < ApplicationDecorator
     when "blip_update"
       "Edited blip ##{vals['blip_id']} by #{user}"
     when "blip_delete"
-      if vals['username']
+      if vals["username"]
         "Deleted blip ##{vals['blip_id']} by #{user}"
       else
         "Deleted blip ##{vals['blip_id']}"
       end
     when "blip_hide"
-      if vals['username']
+      if vals["username"]
         "Hid blip ##{vals['blip_id']} by #{user}"
       else
         "Hid blip ##{vals['blip_id']}"
@@ -318,25 +318,23 @@ class ModActionDecorator < ApplicationDecorator
       ### Whitelist ###
 
     when "upload_whitelist_create"
-      if vals['hidden'] && !CurrentUser.is_admin?
+      if vals["hidden"] && !CurrentUser.is_admin?
         "Created whitelist entry"
       else
         "Created whitelist entry '#{CurrentUser.is_admin? ? vals['pattern'] : vals['note']}'"
       end
 
     when "upload_whitelist_update"
-      if vals['hidden'] && !CurrentUser.is_admin?
+      if vals["hidden"] && !CurrentUser.is_admin?
         "Edited whitelist entry"
+      elsif vals["old_pattern"] && vals["old_pattern"] != vals["pattern"] && CurrentUser.is_admin?
+        "Edited whitelist entry '#{vals['old_pattern']}' → '#{vals['pattern']}'"
       else
-        if vals['old_pattern'] && vals['old_pattern'] != vals['pattern'] && CurrentUser.is_admin?
-          "Edited whitelist entry '#{vals['old_pattern']}' → '#{vals['pattern']}'"
-        else
-          "Edited whitelist entry '#{CurrentUser.is_admin? ? vals['pattern'] : vals['note']}'"
-        end
+        "Edited whitelist entry '#{CurrentUser.is_admin? ? vals['pattern'] : vals['note']}'"
       end
 
     when "upload_whitelist_delete"
-      if vals['hidden'] && !CurrentUser.is_admin?
+      if vals["hidden"] && !CurrentUser.is_admin?
         "Deleted whitelist entry"
       else
         "Deleted whitelist entry '#{CurrentUser.is_admin? ? vals['pattern'] : vals['note']}'"

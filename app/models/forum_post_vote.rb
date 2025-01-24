@@ -3,13 +3,13 @@
 class ForumPostVote < ApplicationRecord
   belongs_to_creator
   belongs_to :forum_post
-  validates :creator_id, uniqueness: {scope: :forum_post_id}
-  validates :score, inclusion: {in: [-1, 0, 1]}
+  validates :creator_id, uniqueness: { scope: :forum_post_id }
+  validates :score, inclusion: { in: [-1, 0, 1] }
   validate :validate_creator_is_not_limited, on: :create
-  scope :up, -> {where(score: 1)}
-  scope :down, -> {where(score: -1)}
-  scope :by, ->(user_id) {where(creator_id: user_id)}
-  scope :excluding_user, ->(user_id) {where("creator_id <> ?", user_id)}
+  scope :up, -> { where(score: 1) }
+  scope :down, -> { where(score: -1) }
+  scope :by, ->(user_id) { where(creator_id: user_id) }
+  scope :excluding_user, ->(user_id) { where.not(creator_id: user_id) }
 
   def creator_name
     if association(:creator).loaded?
@@ -55,11 +55,11 @@ class ForumPostVote < ApplicationRecord
 
   def vote_type
     if score == 1
-      return "up"
+      "up"
     elsif score == -1
-      return "down"
+      "down"
     elsif score == 0
-      return "meh"
+      "meh"
     else
       raise
     end

@@ -39,7 +39,7 @@ class UserPresenter
     permissions.join(", ")
   end
 
-  def upload_limit(template)
+  def upload_limit(_template)
     if user.can_upload_free?
       return "none"
     end
@@ -156,10 +156,10 @@ class UserPresenter
 
     total_class = (positive - negative) > 0 ? "user-feedback-positive" : "user-feedback-negative"
     total_class = "" if (positive - negative) == 0
-    positive_html = %{<span class="user-feedback-positive">#{positive}</span>}.html_safe if positive > 0
-    neutral_html = %{<span class="user-feedback-neutral">#{neutral}</span>}.html_safe if neutral > 0
-    negative_html = %{<span class="user-feedback-negative">#{negative}</span>}.html_safe if negative > 0
-    deleted_html = %{<span class="user-feedback-deleted">#{deleted}</span>}.html_safe if deleted > 0
+    positive_html = %(<span class="user-feedback-positive">#{positive}</span>).html_safe if positive > 0
+    neutral_html = %(<span class="user-feedback-neutral">#{neutral}</span>).html_safe if neutral > 0
+    negative_html = %(<span class="user-feedback-negative">#{negative}</span>).html_safe if negative > 0
+    deleted_html = %(<span class="user-feedback-deleted">#{deleted}</span>).html_safe if deleted > 0
     list_html = "#{positive_html} #{neutral_html} #{negative_html} #{deleted_html}".strip
 
     %{<span class="#{total_class}">#{positive - negative}</span> (#{list_html})}.html_safe
@@ -172,7 +172,7 @@ class UserPresenter
   def favorite_tags_with_types
     tag_names = user&.favorite_tags.to_s.split
     tag_names = TagAlias.to_aliased(tag_names)
-    indices = tag_names.each_with_index.map {|x, i| [x, i]}.to_h
+    indices = tag_names.each_with_index.map { |x, i| [x, i] }.to_h
     tags = Tag.where(name: tag_names).map do |tag|
       {
         name: tag.name,

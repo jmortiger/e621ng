@@ -30,7 +30,7 @@ class Comment < ApplicationRecord
   user_status_counter :comment_count
   belongs_to :post, counter_cache: :comment_count
   belongs_to :warning_user, class_name: "User", optional: true
-  has_many :votes, :class_name => "CommentVote", :dependent => :destroy
+  has_many :votes, class_name: "CommentVote", dependent: :destroy
 
   scope :deleted, -> { where(is_hidden: true) }
   scope :undeleted, -> { where(is_hidden: false) }
@@ -162,16 +162,16 @@ class Comment < ApplicationRecord
     return unless post
     other_comments = Comment.where("post_id = ? and id <> ?", post_id, id).order("id DESC")
     if other_comments.count == 0
-      post.update_columns(:last_commented_at => nil)
+      post.update_columns(last_commented_at: nil)
     else
-      post.update_columns(:last_commented_at => other_comments.first.created_at)
+      post.update_columns(last_commented_at: other_comments.first.created_at)
     end
 
     other_comments = other_comments.where("do_not_bump_post = FALSE")
     if other_comments.count == 0
-      post.update_columns(:last_comment_bumped_at => nil)
+      post.update_columns(last_comment_bumped_at: nil)
     else
-      post.update_columns(:last_comment_bumped_at => other_comments.first.created_at)
+      post.update_columns(last_comment_bumped_at: other_comments.first.created_at)
     end
     post.update_index
     true
@@ -214,7 +214,7 @@ class Comment < ApplicationRecord
   end
 
   def method_attributes
-    super + [:creator_name, :updater_name]
+    super + %i[creator_name updater_name]
   end
 
   def hide!

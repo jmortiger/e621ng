@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class StorageManager::Local < StorageManager
-  DEFAULT_PERMISSIONS = 0644
+  DEFAULT_PERMISSIONS = 0o644
 
   def store(io, dest_path)
     temp_path = dest_path + "-" + SecureRandom.uuid + ".tmp"
@@ -36,14 +36,14 @@ class StorageManager::Local < StorageManager
     end
     return unless post.is_video?
     Danbooru.config.video_rescales.each_key do |k|
-      ['mp4','webm'].each do |ext|
+      %w[mp4 webm].each do |ext|
         path = file_path(post, ext, :scaled, false, scale_factor: k.to_s)
         new_path = file_path(post, ext, :scaled, true, scale_factor: k.to_s)
         move_file(path, new_path)
       end
     end
-    path = file_path(post, 'mp4', :original, false)
-    new_path = file_path(post, 'mp4', :original, true)
+    path = file_path(post, "mp4", :original, false)
+    new_path = file_path(post, "mp4", :original, true)
     move_file(path, new_path)
   end
 
@@ -55,14 +55,14 @@ class StorageManager::Local < StorageManager
     end
     return unless post.is_video?
     Danbooru.config.video_rescales.each_key do |k|
-      ['mp4','webm'].each do |ext|
+      %w[mp4 webm].each do |ext|
         path = file_path(post, ext, :scaled, true, scale_factor: k.to_s)
         new_path = file_path(post, ext, :scaled, false, scale_factor: k.to_s)
         move_file(path, new_path)
       end
     end
-    path = file_path(post, 'mp4', :original, true)
-    new_path = file_path(post, 'mp4', :original, false)
+    path = file_path(post, "mp4", :original, true)
+    new_path = file_path(post, "mp4", :original, false)
     move_file(path, new_path)
   end
 

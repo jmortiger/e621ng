@@ -12,7 +12,7 @@
     <% if Danbooru.config.enable_recaptcha? %>
       <%= recaptcha_tags theme: "dark", nonce: content_security_policy_nonce %>
     <% end %>
-    <%= f.submit "Sign up", :data => { :disable_with => "Signing up..." } %>
+    <%= f.submit "Sign up", data: { disable_with: "Signing up..." } %>
   <% end %>
   <section class="session_info">
     <h3>

@@ -20,11 +20,11 @@ module Maintenance
 
           should "not allow a user to create a filter belonging to another user" do
             params = {
-              :dmail_id => @dmail.id,
-              :dmail_filter => {
-                :words => "owned",
-                :user_id => @user2.id
-              }
+              dmail_id: @dmail.id,
+              dmail_filter: {
+                words: "owned",
+                user_id: @user2.id,
+              },
             }
 
             put_auth maintenance_user_dmail_filter_path, @user1, params: params

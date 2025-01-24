@@ -19,10 +19,10 @@ class BulkUpdateRequestTest < ActiveSupport::TestCase
         create(:post, tag_string: "eee")
 
         @script = "create alias aaa -> 000\n" +
-          "create implication bbb -> 111\n" +
-          "remove alias ccc -> 222\n" +
-          "remove implication ddd -> 333\n" +
-          "mass update eee -> 444\n"
+                  "create implication bbb -> 111\n" +
+                  "remove alias ccc -> 222\n" +
+                  "remove implication ddd -> 333\n" +
+                  "mass update eee -> 444\n"
       end
 
       subject { BulkUpdateRequest.new(script: @script) }
@@ -34,10 +34,10 @@ class BulkUpdateRequestTest < ActiveSupport::TestCase
 
     context "on approval" do
       setup do
-        @script = %q(
+        @script = '
           create alias foo -> bar
           create implication bar -> baz
-        )
+        '
 
         @bur = create(:bulk_update_request, script: @script)
         with_inline_jobs { @bur.approve!(@admin) }

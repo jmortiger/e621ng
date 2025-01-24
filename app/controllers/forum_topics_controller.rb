@@ -11,17 +11,6 @@ class ForumTopicsController < ApplicationController
   before_action :ensure_lockdown_disabled, except: %i[index show]
   skip_before_action :api_check
 
-  def new
-    @forum_topic = ForumTopic.new(forum_topic_params)
-    @forum_topic.original_post = ForumPost.new(forum_topic_params[:original_post_attributes])
-    respond_with(@forum_topic)
-  end
-
-  def edit
-    check_privilege(@forum_topic)
-    respond_with(@forum_topic)
-  end
-
   def index
     params[:search] ||= {}
     params[:search][:order] ||= "sticky" if request.format == Mime::Type.lookup("text/html")
@@ -34,7 +23,7 @@ class ForumTopicsController < ApplicationController
         @forum_topics = @forum_topics.includes(:creator, :updater).load
       end
       format.json do
-        render :json => @forum_topics.to_json
+        render json: @forum_topics.to_json
       end
     end
   end
@@ -45,6 +34,17 @@ class ForumTopicsController < ApplicationController
     end
     @forum_posts = ForumPost.permitted(CurrentUser.user).includes(topic: [:category]).search(topic_id: @forum_topic.id).reorder("forum_posts.id").paginate(params[:page])
     @original_forum_post_id = @forum_topic.original_post.id
+    respond_with(@forum_topic)
+  end
+
+  def new
+    @forum_topic = ForumTopic.new(forum_topic_params)
+    @forum_topic.original_post = ForumPost.new(forum_topic_params[:original_post_attributes])
+    respond_with(@forum_topic)
+  end
+
+  def edit
+    check_privilege(@forum_topic)
     respond_with(@forum_topic)
   end
 
@@ -92,15 +92,15 @@ class ForumTopicsController < ApplicationController
   end
 
   def subscribe
-    subscription = ForumSubscription.where(:forum_topic_id => @forum_topic.id, :user_id => CurrentUser.user.id).first
+    subscription = ForumSubscription.where(forum_topic_id: @forum_topic.id, user_id: CurrentUser.user.id).first
     unless subscription
-      ForumSubscription.create(:forum_topic_id => @forum_topic.id, :user_id => CurrentUser.user.id, :last_read_at => @forum_topic.updated_at)
+      ForumSubscription.create(forum_topic_id: @forum_topic.id, user_id: CurrentUser.user.id, last_read_at: @forum_topic.updated_at)
     end
     respond_with(@forum_topic)
   end
 
   def unsubscribe
-    subscription = ForumSubscription.where(:forum_topic_id => @forum_topic.id, :user_id => CurrentUser.user.id).first
+    subscription = ForumSubscription.where(forum_topic_id: @forum_topic.id, user_id: CurrentUser.user.id).first
     if subscription
       subscription.destroy
     end
@@ -108,6 +108,7 @@ class ForumTopicsController < ApplicationController
   end
 
   private
+
   def per_page
     params[:limit] || 40
   end
@@ -125,7 +126,7 @@ class ForumTopicsController < ApplicationController
   end
 
   def check_privilege(forum_topic)
-    if !forum_topic.editable_by?(CurrentUser.user)
+    unless forum_topic.editable_by?(CurrentUser.user)
       raise User::PrivilegeError
     end
   end

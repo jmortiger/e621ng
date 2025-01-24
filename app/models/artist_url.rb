@@ -6,7 +6,7 @@ class ArtistUrl < ApplicationRecord
   validates :url, presence: true, uniqueness: { scope: :artist_id }
   validates :url, length: { in: 1..4096 }
   validate :validate_url_format
-  belongs_to :artist, :touch => true
+  belongs_to :artist, touch: true
 
   scope :url_matches, ->(url) { url_attribute_matches(:url, url) }
   scope :normalized_url_matches, ->(url) { url_attribute_matches(:normalized_url, url) }
@@ -22,11 +22,11 @@ class ArtistUrl < ApplicationRecord
     if url.nil?
       nil
     else
-      url = url.sub(%r!^https://!, "http://")
-      url = url.sub(%r!^http://([^/]+)!i) { |domain| domain.downcase }
+      url = url.sub(%r{^https://}, "http://")
+      url = url.sub(%r{^http://([^/]+)}i) { |domain| domain.downcase }
 
-      url = url.gsub(/\/+\Z/, "")
-      url = url.gsub(%r!^https://!, "http://")
+      url = url.gsub(%r{/+\Z}, "")
+      url = url.gsub(%r{^https://}, "http://")
       url + "/"
     end
   end
@@ -156,8 +156,8 @@ class ArtistUrl < ApplicationRecord
 
   def validate_url_format
     uri = Addressable::URI.parse(url)
-    errors.add(:url, "'#{uri}' must begin with http:// or https:// ") if !uri.scheme.in?(%w[http https])
-  rescue Addressable::URI::InvalidURIError => error
-    errors.add(:url, "'#{uri}' is malformed: #{error}")
+    errors.add(:url, "'#{uri}' must begin with http:// or https:// ") unless uri.scheme.in?(%w[http https])
+  rescue Addressable::URI::InvalidURIError => e
+    errors.add(:url, "'#{uri}' is malformed: #{e}")
   end
 end

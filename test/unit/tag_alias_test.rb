@@ -18,16 +18,16 @@ class TagAliasTest < ActiveSupport::TestCase
         create(:tag_alias, antecedent_name: "aaa", consequent_name: "bbb", status: "active")
       end
 
-      should allow_value('active').for(:status)
-      should allow_value('deleted').for(:status)
-      should allow_value('pending').for(:status)
-      should allow_value('processing').for(:status)
-      should allow_value('queued').for(:status)
-      should allow_value('error: derp').for(:status)
+      should allow_value("active").for(:status)
+      should allow_value("deleted").for(:status)
+      should allow_value("pending").for(:status)
+      should allow_value("processing").for(:status)
+      should allow_value("queued").for(:status)
+      should allow_value("error: derp").for(:status)
 
-      should_not allow_value('ACTIVE').for(:status)
-      should_not allow_value('error').for(:status)
-      should_not allow_value('derp').for(:status)
+      should_not allow_value("ACTIVE").for(:status)
+      should_not allow_value("error").for(:status)
+      should_not allow_value("derp").for(:status)
 
       should allow_value(nil).for(:forum_topic_id)
       should_not allow_value(-1).for(:forum_topic_id).with_message("must exist", against: :forum_topic)
@@ -124,9 +124,9 @@ class TagAliasTest < ActiveSupport::TestCase
       ta = create(:tag_alias, antecedent_name: "aaa", consequent_name: "bbb")
 
       assert_equal(["bbb"], TagAlias.to_aliased("aaa"))
-      assert_equal(["bbb", "ccc"], TagAlias.to_aliased(["aaa", "ccc"]))
-      assert_equal(["ccc", "bbb"], TagAlias.to_aliased(["ccc", "bbb"]))
-      assert_equal(["bbb"], TagAlias.to_aliased(["aaa", "aaa"]))
+      assert_equal(%w[bbb ccc], TagAlias.to_aliased(%w[aaa ccc]))
+      assert_equal(%w[ccc bbb], TagAlias.to_aliased(%w[ccc bbb]))
+      assert_equal(["bbb"], TagAlias.to_aliased(%w[aaa aaa]))
     end
 
     should "update any affected posts when saved" do

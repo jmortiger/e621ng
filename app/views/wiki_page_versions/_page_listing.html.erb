@@ -21,7 +21,7 @@
           <tr>
             <td>
               <% if i < @wiki_page_versions.length - 1 %>
-                <%= link_to "diff", diff_wiki_page_versions_path(:otherpage => wiki_page_version.id, :thispage => @wiki_page_versions[i + 1].id) %>
+                <%= link_to "diff", diff_wiki_page_versions_path(otherpage: wiki_page_version.id, thispage: @wiki_page_versions[i + 1].id) %>
               <% else %>
                 diff
               <% end %>

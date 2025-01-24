@@ -15,7 +15,7 @@
            | <%= tag.a "Delete with given reason", href: '#', 'data-post-id': post.id, class: 'delete-with-reason-link button btn-neutral', 'data-reason': '', 'data-prompt': 'given reason' %>
         <% end %>
         <% if !post.parent_id.nil? && post.pending_flag&.reason =~ %r{Inferior version/duplicate of post #\d+} %>
-           | <%= tag.a "Move flag to parent", href: '#', 'data-pid': post.id, 'data-parent-id': post.parent_id, class: 'move-flag-to-parent-link button btn-neutral' %>
+           | <%= tag.a "Move flag to parent", "href": "#", 'data-pid': post.id, 'data-parent-id': post.parent_id, "class": "move-flag-to-parent-link button btn-neutral" %>
         <% end %>
       </div>
     <% end %>
@@ -58,6 +58,6 @@
 
 <% if post.replacements.pending.any? %>
   <div class="notice notice-flagged">
-    <p>This post has <%= link_to "pending replacements.", post_replacements_path(search: {post_id: @post.id}) %></p>
+    <p>This post has <%= link_to "pending replacements.", post_replacements_path(search: { post_id: @post.id }) %></p>
   </div>
 <% end %>

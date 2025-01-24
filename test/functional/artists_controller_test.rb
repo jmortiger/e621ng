@@ -70,7 +70,7 @@ class ArtistsControllerTest < ActionDispatch::IntegrationTest
       should "update an artist" do
         old_timestamp = @wiki_page.updated_at
         travel_to(1.minute.from_now) do
-          put_auth artist_path(@artist.id), @user, params: {artist: {notes: "rex", url_string: "http://example.com\nhttp://monet.com"}}
+          put_auth artist_path(@artist.id), @user, params: { artist: { notes: "rex", url_string: "http://example.com\nhttp://monet.com" } }
         end
         @artist.reload
         @wiki_page = @artist.wiki_page
@@ -98,7 +98,7 @@ class ArtistsControllerTest < ActionDispatch::IntegrationTest
       context "when renaming an artist" do
         should "automatically rename the artist's wiki page" do
           assert_difference("WikiPage.count", 0) do
-            put_auth artist_path(@artist.id), @user, params: {artist: {name: "bbb", notes: "more testing"}}
+            put_auth artist_path(@artist.id), @user, params: { artist: { name: "bbb", notes: "more testing" } }
           end
           @wiki_page.reload
           assert_equal("bbb", @wiki_page.title)
@@ -124,14 +124,14 @@ class ArtistsControllerTest < ActionDispatch::IntegrationTest
           @artist.update(name: "abc")
         end
         version = @artist.versions.first
-        put_auth revert_artist_path(@artist.id), @user, params: {version_id: version.id}
+        put_auth revert_artist_path(@artist.id), @user, params: { version_id: version.id }
       end
 
       should "not allow reverting to a previous version of another artist" do
         as(@user) do
           @artist2 = create(:artist)
         end
-        put_auth artist_path(@artist.id), @user, params: {version_id: @artist2.versions.first.id}
+        put_auth artist_path(@artist.id), @user, params: { version_id: @artist2.versions.first.id }
         @artist.reload
         assert_not_equal(@artist.name, @artist2.name)
         assert_redirected_to(artist_path(@artist.id))

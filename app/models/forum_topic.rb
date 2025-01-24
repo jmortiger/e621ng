@@ -3,25 +3,25 @@
 class ForumTopic < ApplicationRecord
   belongs_to_creator
   belongs_to_updater
-  belongs_to :category, class_name: "ForumCategory", foreign_key: :category_id
-  has_many :posts, -> {order("forum_posts.id asc")}, :class_name => "ForumPost", :foreign_key => "topic_id", :dependent => :destroy
-  has_one :original_post, -> {order("forum_posts.id asc")}, class_name: "ForumPost", foreign_key: "topic_id", inverse_of: :topic
-  has_many :subscriptions, :class_name => "ForumSubscription"
-  before_validation :initialize_is_hidden, :on => :create
+  belongs_to :category, class_name: "ForumCategory"
+  has_many :posts, -> { order("forum_posts.id asc") }, class_name: "ForumPost", foreign_key: "topic_id", dependent: :destroy
+  has_one :original_post, -> { order("forum_posts.id asc") }, class_name: "ForumPost", foreign_key: "topic_id", inverse_of: :topic
+  has_many :subscriptions, class_name: "ForumSubscription"
+  before_validation :initialize_is_hidden, on: :create
   validate :category_valid
   validates :title, :creator_id, presence: true
   validates_associated :original_post
-  validates_presence_of :original_post
-  validates :title, :length => {:maximum => 250}
+  validates :original_post, presence: true
+  validates :title, length: { maximum: 250 }
   validate :category_allows_creation, on: :create
   accepts_nested_attributes_for :original_post
-  before_destroy :create_mod_action_for_delete
   after_update :update_original_post
-  after_save(:if => ->(rec) {rec.saved_change_to_is_locked?}) do |rec|
-    ModAction.log(rec.is_locked ? :forum_topic_lock : :forum_topic_unlock, {forum_topic_id: rec.id, forum_topic_title: rec.title, user_id: rec.creator_id})
+  before_destroy :create_mod_action_for_delete
+  after_save(if: ->(rec) { rec.saved_change_to_is_locked? }) do |rec|
+    ModAction.log(rec.is_locked ? :forum_topic_lock : :forum_topic_unlock, { forum_topic_id: rec.id, forum_topic_title: rec.title, user_id: rec.creator_id })
   end
-  after_save(:if => ->(rec) {rec.saved_change_to_is_sticky?}) do |rec|
-    ModAction.log(rec.is_sticky ? :forum_topic_stick : :forum_topic_unstick, {forum_topic_id: rec.id, forum_topic_title: rec.title, user_id: rec.creator_id})
+  after_save(if: ->(rec) { rec.saved_change_to_is_sticky? }) do |rec|
+    ModAction.log(rec.is_sticky ? :forum_topic_stick : :forum_topic_unstick, { forum_topic_id: rec.id, forum_topic_title: rec.title, user_id: rec.creator_id })
   end
 
   module CategoryMethods
@@ -29,12 +29,12 @@ class ForumTopic < ApplicationRecord
 
     module ClassMethods
       def for_category_id(cid)
-        where(:category_id => cid)
+        where(category_id: cid)
       end
     end
 
     def category_name
-      return '(Unknown)' unless category
+      return "(Unknown)" unless category
       category.name
     end
 
@@ -47,7 +47,7 @@ class ForumTopic < ApplicationRecord
     def category_allows_creation
       if category && !category.can_create_within?(creator)
         errors.add(:category, "does not allow new topics")
-        return false
+        false
       end
     end
   end
@@ -110,17 +110,17 @@ class ForumTopic < ApplicationRecord
     def mark_as_read!(user = CurrentUser.user)
       return if user.is_anonymous?
 
-      match = ForumTopicVisit.where(:user_id => user.id, :forum_topic_id => id).first
+      match = ForumTopicVisit.where(user_id: user.id, forum_topic_id: id).first
       if match
         match.update_attribute(:last_read_at, updated_at)
       else
-        ForumTopicVisit.create(:user_id => user.id, :forum_topic_id => id, :last_read_at => updated_at)
+        ForumTopicVisit.create(user_id: user.id, forum_topic_id: id, last_read_at: updated_at)
       end
 
       has_unread_topics = ForumTopic.visible(user).where("forum_topics.updated_at >= ?", user.last_forum_read_at)
-      .joins("left join forum_topic_visits on (forum_topic_visits.forum_topic_id = forum_topics.id and forum_topic_visits.user_id = #{user.id})")
-      .where("(forum_topic_visits.id is null or forum_topic_visits.last_read_at < forum_topics.updated_at)")
-      .exists?
+                                    .joins("left join forum_topic_visits on (forum_topic_visits.forum_topic_id = forum_topics.id and forum_topic_visits.user_id = #{user.id})")
+                                    .where("(forum_topic_visits.id is null or forum_topic_visits.last_read_at < forum_topics.updated_at)")
+                                    .exists?
       unless has_unread_topics
         user.update_attribute(:last_forum_read_at, Time.now)
         ForumTopicVisit.prune!(user)
@@ -130,7 +130,7 @@ class ForumTopic < ApplicationRecord
 
   module SubscriptionMethods
     def user_subscription(user)
-      subscriptions.where(:user_id => user.id).first
+      subscriptions.where(user_id: user.id).first
     end
   end
 
@@ -161,15 +161,15 @@ class ForumTopic < ApplicationRecord
   end
 
   def create_mod_action_for_delete
-    ModAction.log(:forum_topic_delete, {forum_topic_id: id, forum_topic_title: title, user_id: creator_id})
+    ModAction.log(:forum_topic_delete, { forum_topic_id: id, forum_topic_title: title, user_id: creator_id })
   end
 
   def create_mod_action_for_hide
-    ModAction.log(:forum_topic_hide, {forum_topic_id: id, forum_topic_title: title, user_id: creator_id})
+    ModAction.log(:forum_topic_hide, { forum_topic_id: id, forum_topic_title: title, user_id: creator_id })
   end
 
   def create_mod_action_for_unhide
-    ModAction.log(:forum_topic_unhide, {forum_topic_id: id, forum_topic_title: title, user_id: creator_id})
+    ModAction.log(:forum_topic_unhide, { forum_topic_id: id, forum_topic_title: title, user_id: creator_id })
   end
 
   def initialize_is_hidden
@@ -190,7 +190,7 @@ class ForumTopic < ApplicationRecord
 
   def update_original_post
     if original_post
-      original_post.update_columns(:updater_id => CurrentUser.id, :updated_at => Time.now)
+      original_post.update_columns(updater_id: CurrentUser.id, updated_at: Time.now)
     end
   end
 end

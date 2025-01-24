@@ -229,7 +229,7 @@
 
       <% if CurrentUser.is_member? %>
         <section id="edit" style="display: none;">
-          <%= render "posts/partials/show/edit", :post => @post %>
+          <%= render "posts/partials/show/edit", post: @post %>
         </section>
       <% end %>
     </section>
@@ -274,7 +274,7 @@
   <%= tag.meta property: "og:url", content: post_url(@post, host: Danbooru.config.hostname, protocol: "https") %>
 
   <% if @post.visible? %>
-    <% if @post.is_video? && @post.has_sample_size?('original') %>
+    <% if @post.is_video? && @post.has_sample_size?("original") %>
       <meta property="og:type" content="video.other">
       <%= tag.meta property: "og:video", content: @post.open_graph_video_url %>
       <%= tag.meta property: "og:image", content: @post.open_graph_image_url %>

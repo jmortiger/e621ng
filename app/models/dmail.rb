@@ -8,9 +8,9 @@ class Dmail < ApplicationRecord
   validate :recipient_accepts_dmails, on: :create
   validate :user_not_limited, on: :create
 
-  belongs_to :owner, :class_name => "User"
-  belongs_to :to, :class_name => "User"
-  belongs_to :from, :class_name => "User"
+  belongs_to :owner, class_name: "User"
+  belongs_to :to, class_name: "User"
+  belongs_to :from, class_name: "User"
 
   after_initialize :initialize_attributes, if: :new_record?
   before_create :auto_read_if_filtered
@@ -151,7 +151,7 @@ class Dmail < ApplicationRecord
     day_allowed = CurrentUser.can_dmail_day_with_reason
     if day_allowed != true
       errors.add(:base, "Sender #{User.throttle_reason(day_allowed, 'daily')}")
-      return
+      nil
     end
   end
 
@@ -172,7 +172,7 @@ class Dmail < ApplicationRecord
     end
     if to.is_blacklisting_user?(from)
       errors.add(:to_name, "does not wish to receive DMails from you")
-      return false
+      false
     end
   end
 

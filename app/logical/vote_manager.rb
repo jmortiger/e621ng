@@ -148,8 +148,6 @@ class VoteManager
     comment_unvote!(comment: vote.comment, user: vote.user, force: true) if vote
   end
 
-  private
-
   def self.subtract_vote(post, vote)
     vote_cols = "score = score - #{vote.score}"
     if vote.score > 0

@@ -85,19 +85,19 @@ class ForumPostsControllerTest < ActionDispatch::IntegrationTest
 
       context "with search conditions" do
         should "list all matching forum posts" do
-          get forum_posts_path, params: {:search => {:body_matches => "xxx"}}
+          get forum_posts_path, params: { search: { body_matches: "xxx" } }
           assert_response :success
           assert_select "#forum-post-#{@forum_post.id}"
         end
 
         should "list nothing for when the search matches nothing" do
-          get forum_posts_path, params: {:search => {:body_matches => "bababa"}}
+          get forum_posts_path, params: { search: { body_matches: "bababa" } }
           assert_response :success
           assert_select "#forum-post-#{@forum_post.id}", false
         end
 
         should "list by creator id" do
-          get forum_posts_path, params: {:search => {:creator_id => @user.id}}
+          get forum_posts_path, params: { search: { creator_id: @user.id } }
           assert_response :success
           assert_select "#forum-post-#{@forum_post.id}"
         end
@@ -123,7 +123,7 @@ class ForumPostsControllerTest < ActionDispatch::IntegrationTest
 
     context "new action" do
       should "render" do
-        get_auth new_forum_post_path, @user, params: { forum_post: { topic_id: @forum_topic.id }}
+        get_auth new_forum_post_path, @user, params: { forum_post: { topic_id: @forum_topic.id } }
         assert_response :success
       end
     end
@@ -131,7 +131,7 @@ class ForumPostsControllerTest < ActionDispatch::IntegrationTest
     context "create action" do
       should "create a new forum post" do
         assert_difference("ForumPost.count", 1) do
-          post_auth forum_posts_path, @user, params: {:forum_post => {:body => "xaxaxa", :topic_id => @forum_topic.id}}
+          post_auth forum_posts_path, @user, params: { forum_post: { body: "xaxaxa", topic_id: @forum_topic.id } }
         end
       end
     end

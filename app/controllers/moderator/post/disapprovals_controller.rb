@@ -7,6 +7,11 @@ module Moderator
       skip_before_action :api_check
       respond_to :html, :json
 
+      def index
+        @post_disapprovals = PostDisapproval.includes(:user).search(search_params).paginate(params[:page], limit: params[:limit])
+        respond_with(@post_disapprovals)
+      end
+
       def create
         pd_params = post_disapproval_params
         @post_disapproval = PostDisapproval.create_with(post_disapproval_params).find_or_create_by(user_id: CurrentUser.id, post_id: pd_params[:post_id])
@@ -21,11 +26,6 @@ module Moderator
             redirect_to post_path(id: pd_params[:post_id])
           end
         end
-      end
-
-      def index
-        @post_disapprovals = PostDisapproval.includes(:user).search(search_params).paginate(params[:page], limit: params[:limit])
-        respond_with(@post_disapprovals)
       end
 
       private

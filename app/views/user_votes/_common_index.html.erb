@@ -60,7 +60,7 @@
     </table>
     <br/>
     <%= tag.button "Select All", id: "select-all-votes" %><br/>
-    <%= tag.button "Lock Votes",  id: "lock-votes" %> Set the votes to 0, preventing the user
+    <%= tag.button "Lock Votes", id: "lock-votes" %> Set the votes to 0, preventing the user
     from voting on the <%= type.model_type %> again<br/>
     <% if CurrentUser.is_admin? %>
       <%= tag.button "Delete Votes", id: "delete-votes" %> Remove the votes

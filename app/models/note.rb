@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
 class Note < ApplicationRecord
-  class RevertError < Exception ; end
+  class RevertError < Exception; end
 
   attr_accessor :html_id
+
   belongs_to :post
   belongs_to_creator
-  has_many :versions, -> {order("note_versions.id ASC")}, :class_name => "NoteVersion", :dependent => :destroy
+  has_many :versions, -> { order("note_versions.id ASC") }, class_name: "NoteVersion", dependent: :destroy
   normalizes :body, with: ->(body) { body.gsub("\r\n", "\n") }
   validates :post_id, :creator_id, :x, :y, :width, :height, :body, presence: true
   validate :user_not_limited
@@ -73,24 +74,24 @@ class Note < ApplicationRecord
   end
 
   def post_must_exist
-    if !Post.exists?(post_id)
+    unless Post.exists?(post_id)
       errors.add :post, "must exist"
-      return false
+      false
     end
   end
 
   def post_must_not_be_note_locked
     if is_locked?
       errors.add :post, "is note locked"
-      return false
+      false
     end
   end
 
   def note_within_image
     return false unless post.present?
     if x < 0 || y < 0 || (x > post.image_width) || (y > post.image_height) || width < 0 || height < 0 || (x + width > post.image_width) || (y + height > post.image_height)
-      self.errors.add(:note, "must be inside the image")
-      return false
+      errors.add(:note, "must be inside the image")
+      false
     end
   end
 
@@ -117,7 +118,7 @@ class Note < ApplicationRecord
   def create_version(updater: CurrentUser.user, updater_ip_addr: CurrentUser.ip_addr)
     return unless saved_change_to_versioned_attributes?
 
-    Note.where(:id => id).update_all("version = coalesce(version, 0) + 1")
+    Note.where(id: id).update_all("version = coalesce(version, 0) + 1")
     reload
     create_new_version(updater.id, updater_ip_addr)
   end
@@ -128,16 +129,16 @@ class Note < ApplicationRecord
 
   def create_new_version(updater_id, updater_ip_addr)
     versions.create(
-      :updater_id => updater_id,
-      :updater_ip_addr => updater_ip_addr,
-      :post_id => post_id,
-      :x => x,
-      :y => y,
-      :width => width,
-      :height => height,
-      :is_active => is_active,
-      :body => body,
-      :version => version
+      updater_id: updater_id,
+      updater_ip_addr: updater_ip_addr,
+      post_id: post_id,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      is_active: is_active,
+      body: body,
+      version: version,
     )
   end
 

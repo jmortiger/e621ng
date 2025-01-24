@@ -4,26 +4,10 @@ class TagsController < ApplicationController
   before_action :member_only, only: %i[edit update preview]
   respond_to :html, :json
 
-  def edit
-    @from_wiki = request.referer.try(:include?, "wiki_pages") || false
-    @tag = Tag.find(params[:id])
-    check_privilege(@tag)
-    respond_with(@tag)
-  end
-
   def index
-    @tags = Tag.search(search_params).paginate(params[:page], :limit => params[:limit], :search_count => params[:search])
+    @tags = Tag.search(search_params).paginate(params[:page], limit: params[:limit], search_count: params[:search])
 
     respond_with(@tags)
-  end
-
-  def preview
-    @preview = TagsPreview.new(tags: params[:tags])
-    respond_to do |format|
-      format.json do
-        render json: @preview.serializable_hash
-      end
-    end
   end
 
   def show
@@ -33,6 +17,22 @@ class TagsController < ApplicationController
       @tag = Tag.find_by!(name: params[:id])
     end
     respond_with(@tag)
+  end
+
+  def edit
+    @from_wiki = request.referer.try(:include?, "wiki_pages") || false
+    @tag = Tag.find(params[:id])
+    check_privilege(@tag)
+    respond_with(@tag)
+  end
+
+  def preview
+    @preview = TagsPreview.new(tags: params[:tags])
+    respond_to do |format|
+      format.json do
+        render json: @preview.serializable_hash
+      end
+    end
   end
 
   def update

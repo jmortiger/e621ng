@@ -50,12 +50,12 @@
           <% end %>
 
           <% if CurrentUser.is_member? %>
-            <li><%= link_to "Report", new_ticket_path(disp_id: blip.id, qtype: 'blip') %></li>
+            <li><%= link_to "Report", new_ticket_path(disp_id: blip.id, qtype: "blip") %></li>
           <% end %>
 
           <% if CurrentUser.is_moderator? %>
             <li>|</li>
-            <li><%= link_to "Show Edits", edit_history_path(id: blip.id, type: 'Blip') %></li>
+            <li><%= link_to "Show Edits", edit_history_path(id: blip.id, type: "Blip") %></li>
             <%= render "user_warnable/buttons", model: blip %>
           <% end %>
           <% if CurrentUser.is_admin? %>

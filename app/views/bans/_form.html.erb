@@ -3,8 +3,8 @@
   <% if ban.new_record? %>
     <%= f.input :user_name, :as => :string, autocomplete: "user" %>
   <% end %>
-  <%= f.input :duration, :hint => "in days" %>
-  <%= f.input :is_permaban, as: :boolean, hint: 'ignores days' %>
+  <%= f.input :duration, hint: "in days" %>
+  <%= f.input :is_permaban, as: :boolean, hint: "ignores days" %>
   <%= f.input :reason, as: :dtext, allow_color: false %>
-  <%= f.button :submit, :value => "Ban" %>
+  <%= f.button :submit, value: "Ban" %>
 <% end %>

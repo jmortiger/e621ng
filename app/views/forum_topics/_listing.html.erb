@@ -22,7 +22,7 @@
           <%= link_to topic.title, forum_topic_path(topic), class: "forum-post-link" %>
 
           <% if topic.last_page > 1 %>
-            <%= link_to "page #{topic.last_page}", forum_topic_path(topic, :page => topic.last_page), :class => "last-page" %>
+            <%= link_to "page #{topic.last_page}", forum_topic_path(topic, page: topic.last_page), class: "last-page" %>
           <% end %>
 
           <% if topic.is_locked? %>
@@ -34,7 +34,7 @@
         </td>
         <td class="updated-at updater"><%= link_to_user topic.updater %> <%= time_ago_in_words_tagged topic.updated_at, compact: true %></td>
         <td class="created-at creator"><%= link_to_user topic.creator %> <%= time_ago_in_words_tagged topic.created_at, compact: true %></td>
-        <td><%= topic.response_count-1 %></td>
+        <td><%= topic.response_count - 1 %></td>
       </tr>
     <% end %>
   </tbody>

@@ -21,7 +21,7 @@ class RelatedTagQueryTest < ActiveSupport::TestCase
       end
 
       should "work" do
-        assert_equal(["aaa", "bbb", "ccc"], @query.tags)
+        assert_equal(%w[aaa bbb ccc], @query.tags)
       end
 
       should "render the json" do
@@ -69,7 +69,7 @@ class RelatedTagQueryTest < ActiveSupport::TestCase
 
     context "for a tag with a wiki page" do
       setup do
-        @wiki_page = create(:wiki_page, :title => "aaa", body: "[[bbb]] [[ccc]]")
+        @wiki_page = create(:wiki_page, title: "aaa", body: "[[bbb]] [[ccc]]")
         @query = RelatedTagQuery.new(query: "aaa")
       end
     end
@@ -84,7 +84,7 @@ class RelatedTagQueryTest < ActiveSupport::TestCase
     end
 
     should "find the related tags" do
-      assert_equal(%w(ccc), @query.tags)
+      assert_equal(%w[ccc], @query.tags)
     end
   end
 end

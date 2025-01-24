@@ -9,13 +9,13 @@
     <%= render "posts/blank" %>
   <% end %>
 
-  <% @posts.select {|x| x.visible?}.each do |post| %>
+  <% @posts.select { |x| x.visible? }.each do |post| %>
     <% if post.comments.visible(CurrentUser.user).exists? %>
       <div class="comment-post">
         <div class="post-container">
           <%= PostPresenter.preview(post, inline: true, show_deleted: true) %>
           <div class="post-information">
-            <%= render "comments/partials/index/header", :post => post %>
+            <%= render "comments/partials/index/header", post: post %>
           </div>
         </div>
         <div class="comments">

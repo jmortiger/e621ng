@@ -12,7 +12,7 @@ module Moderator
     end
 
     def export
-      search = IpAddrSearch.new(params[:search].merge({with_history: true}))
+      search = IpAddrSearch.new(params[:search].merge({ with_history: true }))
       @results = search.execute
       respond_with(@results) do |format|
         format.json do

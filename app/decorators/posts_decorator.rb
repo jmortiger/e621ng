@@ -38,8 +38,8 @@ class PostsDecorator < ApplicationDecorator
   end
 
   def score_class(score)
-    return 'score-neutral' if score == 0
-    score > 0 ? 'score-positive' : 'score-negative'
+    return "score-neutral" if score == 0
+    score > 0 ? "score-positive" : "score-negative"
   end
 
   def stats_section(template)
@@ -74,8 +74,8 @@ class PostsDecorator < ApplicationDecorator
     end
 
     article_attrs = {
-        "id" => "post_#{post.id}",
-        "class" => preview_class(options).join(" ")
+      "id" => "post_#{post.id}",
+      "class" => preview_class(options).join(" "),
     }.merge(data_attributes)
 
     link_target = options[:link_target] || post
@@ -103,17 +103,17 @@ class PostsDecorator < ApplicationDecorator
     tooltip += "\n\n#{post.tag_string}"
 
     cropped_url = if Danbooru.config.enable_image_cropping? && options[:show_cropped] && post.has_cropped? && !CurrentUser.user.disable_cropped_thumbnails?
-                             post.crop_file_url
-                           else
-                             post.preview_file_url
-                           end
+                    post.crop_file_url
+                  else
+                    post.preview_file_url
+                  end
 
     cropped_url = Danbooru.config.deleted_preview_url if post.deleteblocked?
     preview_url = if post.deleteblocked?
-                             Danbooru.config.deleted_preview_url
-                           else
-                             post.preview_file_url
-                           end
+                    Danbooru.config.deleted_preview_url
+                  else
+                    post.preview_file_url
+                  end
 
     alt_text = "post ##{post.id}"
 

@@ -17,7 +17,7 @@
         <tr>
           <td>
             <%= link_to artist_version.name, artist_path(artist_version.artist_id) %>
-            <%= link_to "»", artist_versions_path(search: {artist_id: artist_version.artist_id}) %>
+            <%= link_to "»", artist_versions_path(search: { artist_id: artist_version.artist_id }) %>
 
             <% if !artist_version.is_active? %>
               (deleted)
@@ -51,7 +51,7 @@
             </p>
           </td>
           <% if artist_versions_listing_type == :revert %>
-            <td><%= link_to "Revert to", revert_artist_path(artist_version.artist_id, version_id: artist_version.id), method: :put, "data-confirm": "Are you sure you want to revert to this version?" %></td>
+            <td><%= link_to "Revert to", revert_artist_path(artist_version.artist_id, version_id: artist_version.id), "method": :put, "data-confirm": "Are you sure you want to revert to this version?" %></td>
           <% end %>
         </tr>
       <% end %>

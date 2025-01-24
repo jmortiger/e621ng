@@ -19,7 +19,7 @@
     <% end %>
 
     <% if CurrentUser.is_janitor? %>
-      <%= f.input :is_locked, :label => "Locked" %>
+      <%= f.input :is_locked, label: "Locked" %>
     <% end %>
 
     <%= f.input :edit_reason, label: "Edit Reason" %>

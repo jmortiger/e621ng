@@ -12,7 +12,7 @@ module Maintenance
 
         should "send the notice" do
           LoginReminderMailer.notice(@user).deliver_now
-          assert !ActionMailer::Base.deliveries.empty?
+          assert_not ActionMailer::Base.deliveries.empty?
         end
       end
     end

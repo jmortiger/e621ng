@@ -10,6 +10,12 @@ class TicketsController < ApplicationController
     respond_with(@tickets)
   end
 
+  def show
+    @ticket = Ticket.find(params[:id])
+    check_permission(@ticket)
+    respond_with(@ticket)
+  end
+
   def new
     @ticket = Ticket.new(qtype: params[:qtype], disp_id: params[:disp_id])
     check_new_permission(@ticket)
@@ -20,18 +26,12 @@ class TicketsController < ApplicationController
     check_new_permission(@ticket)
     if @ticket.valid?
       @ticket.save
-      @ticket.push_pubsub('create')
-      flash[:notice] = 'Ticket created'
+      @ticket.push_pubsub("create")
+      flash[:notice] = "Ticket created"
       redirect_to(ticket_path(@ticket))
     else
       respond_with(@ticket)
     end
-  end
-
-  def show
-    @ticket = Ticket.find(params[:id])
-    check_permission(@ticket)
-    respond_with(@ticket)
   end
 
   def update

@@ -17,10 +17,10 @@ module DmailsHelper
   end
 
   def sent_dmails_path(params = {})
-    dmails_path(search: {from_id: CurrentUser.id}, folder: "sent", **params)
+    dmails_path(search: { from_id: CurrentUser.id }, folder: "sent", **params)
   end
 
   def received_dmails_path(params = {})
-    dmails_path(search: {to_id: CurrentUser.id}, folder: "received", **params)
+    dmails_path(search: { to_id: CurrentUser.id }, folder: "received", **params)
   end
 end

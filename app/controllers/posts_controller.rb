@@ -17,7 +17,7 @@ class PostsController < ApplicationController
       @posts = PostsDecorator.decorate_collection(@post_set.posts)
       respond_with(@posts) do |format|
         format.json do
-          render json: @post_set.api_posts, root: 'posts'
+          render json: @post_set.api_posts, root: "posts"
         end
         format.atom
       end
@@ -30,8 +30,8 @@ class PostsController < ApplicationController
     raise User::PrivilegeError, "Post unavailable" unless Security::Lockdown.post_visible?(@post, CurrentUser.user)
 
     include_deleted = @post.is_deleted? || (@post.parent_id.present? && @post.parent.is_deleted?) || CurrentUser.is_approver?
-    @parent_post_set = PostSets::PostRelationship.new(@post.parent_id, :include_deleted => include_deleted, want_parent: true)
-    @children_post_set = PostSets::PostRelationship.new(@post.id, :include_deleted => include_deleted, want_parent: false)
+    @parent_post_set = PostSets::PostRelationship.new(@post.parent_id, include_deleted: include_deleted, want_parent: true)
+    @children_post_set = PostSets::PostRelationship.new(@post.id, include_deleted: include_deleted, want_parent: false)
     @comment_votes = {}
     @comment_votes = CommentVote.for_comments_and_user(@post.comments.visible(CurrentUser.user).map(&:id), CurrentUser.id) if request.format.html?
 
@@ -41,14 +41,14 @@ class PostsController < ApplicationController
   def show_seq
     @post = PostSearchContext.new(params).post
     include_deleted = @post.is_deleted? || (@post.parent_id.present? && @post.parent.is_deleted?) || CurrentUser.is_approver?
-    @parent_post_set = PostSets::PostRelationship.new(@post.parent_id, :include_deleted => include_deleted, want_parent: true)
-    @children_post_set = PostSets::PostRelationship.new(@post.id, :include_deleted => include_deleted, want_parent: false)
+    @parent_post_set = PostSets::PostRelationship.new(@post.parent_id, include_deleted: include_deleted, want_parent: true)
+    @children_post_set = PostSets::PostRelationship.new(@post.id, include_deleted: include_deleted, want_parent: false)
     @comment_votes = {}
     @comment_votes = CommentVote.for_comments_and_user(@post.comments.visible(CurrentUser.user).map(&:id), CurrentUser.id) if request.format.html?
     @fixup_post_url = true
 
     respond_with(@post) do |fmt|
-      fmt.html { render 'posts/show'}
+      fmt.html { render "posts/show" }
     end
   end
 
@@ -83,18 +83,18 @@ class PostsController < ApplicationController
 
     if @post.errors.any?
       @error_message = @post.errors.full_messages.join("; ")
-      render :json => {:success => false, :reason => @error_message}.to_json, :status => 400
+      render json: { success: false, reason: @error_message }.to_json, status: 400
     else
-      head :no_content
+      head 204
     end
   end
 
   def random
-    tags = params[:tags] || ''
+    tags = params[:tags] || ""
     @post = Post.tag_match(tags + " order:random").limit(1).first
     raise ActiveRecord::RecordNotFound if @post.nil?
     respond_with(@post) do |format|
-      format.html { redirect_to post_path(@post, :tags => params[:tags]) }
+      format.html { redirect_to post_path(@post, tags: params[:tags]) }
     end
   end
 
@@ -124,17 +124,17 @@ class PostsController < ApplicationController
           warnings = post.warnings.full_messages.join(".\n \n")
           if warnings.length > 45_000
             Dmail.create_automated({
-                                       to_id: CurrentUser.id,
-                                       title: "Post update notices for post ##{post.id}",
-                                       body: "While editing post ##{post.id} some notices were generated. Please review them below:\n\n#{warnings[0..45_000]}"
-                                   })
+              to_id: CurrentUser.id,
+              title: "Post update notices for post ##{post.id}",
+              body: "While editing post ##{post.id} some notices were generated. Please review them below:\n\n#{warnings[0..45_000]}",
+            })
             flash[:notice] = "What the heck did you even do to this poor post? That generated way too many warnings. But you get a dmail with most of them anyways"
           elsif warnings.length > 1500
             Dmail.create_automated({
-                                       to_id: CurrentUser.id,
-                                       title: "Post update notices for post ##{post.id}",
-                                       body: "While editing post ##{post.id} some notices were generated. Please review them below:\n\n#{warnings}"
-                                   })
+              to_id: CurrentUser.id,
+              title: "Post update notices for post ##{post.id}",
+              body: "While editing post ##{post.id} some notices were generated. Please review them below:\n\n#{warnings}",
+            })
             flash[:notice] = "This edit created a LOT of notices. They have been dmailed to you. Please review them"
           else
             flash[:notice] = warnings
@@ -160,7 +160,7 @@ class PostsController < ApplicationController
     end
   end
 
-  def ensure_can_edit(post)
+  def ensure_can_edit(_post)
     can_edit = CurrentUser.can_post_edit_with_reason
     raise User::PrivilegeError.new("Updater #{User.throttle_reason(can_edit)}") unless can_edit == true
   end

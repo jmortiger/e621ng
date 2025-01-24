@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 class Tag < ApplicationRecord
-  has_one :wiki_page, :foreign_key => "title", :primary_key => "name"
-  has_one :artist, :foreign_key => "name", :primary_key => "name"
-  has_one :antecedent_alias, -> {active}, :class_name => "TagAlias", :foreign_key => "antecedent_name", :primary_key => "name"
-  has_many :consequent_aliases, -> {active}, :class_name => "TagAlias", :foreign_key => "consequent_name", :primary_key => "name"
-  has_many :antecedent_implications, -> {active}, :class_name => "TagImplication", :foreign_key => "antecedent_name", :primary_key => "name"
-  has_many :consequent_implications, -> {active}, :class_name => "TagImplication", :foreign_key => "consequent_name", :primary_key => "name"
+  has_one :wiki_page, foreign_key: "title", primary_key: "name"
+  has_one :artist, foreign_key: "name", primary_key: "name"
+  has_one :antecedent_alias, -> { active }, class_name: "TagAlias", foreign_key: "antecedent_name", primary_key: "name"
+  has_many :consequent_aliases, -> { active }, class_name: "TagAlias", foreign_key: "consequent_name", primary_key: "name"
+  has_many :antecedent_implications, -> { active }, class_name: "TagImplication", foreign_key: "antecedent_name", primary_key: "name"
+  has_many :consequent_implications, -> { active }, class_name: "TagImplication", foreign_key: "consequent_name", primary_key: "name"
 
   validates :name, uniqueness: true, tag_name: true, on: :create
   validates :name, length: { in: 1..100 }
@@ -87,7 +87,7 @@ class Tag < ApplicationRecord
       def categories_for(tag_names, disable_cache: false)
         if disable_cache
           tag_cats = {}
-          Tag.where(name: Array(tag_names)).select([:id, :name, :category]).find_each do |tag|
+          Tag.where(name: Array(tag_names)).select(%i[id name category]).find_each do |tag|
             tag_cats[tag.name] = tag.category
           end
           tag_cats
@@ -96,7 +96,7 @@ class Tag < ApplicationRecord
           not_found = tag_names - found.keys
           if not_found.count > 0
             # Is multi_write worth it here? Normal usage of this will be short put lists and then never touched.
-            Tag.where(name: not_found).select([:id, :name, :category]).find_each do |tag|
+            Tag.where(name: not_found).select(%i[id name category]).find_each do |tag|
               Cache.write("tc:#{tag.name}", tag.category)
               found[tag.name] = tag.category
             end
@@ -123,7 +123,7 @@ class Tag < ApplicationRecord
         Post.sql_raw_tag_match(name).find_each do |post|
           post.set_tag_counts(disable_cache: false)
           args = TagCategory::CATEGORIES.to_h { |x| ["tag_count_#{x}", post.send("tag_count_#{x}")] }.update("tag_count" => post.tag_count)
-          Post.where(:id => post.id).update_all(args)
+          Post.where(id: post.id).update_all(args)
           post.update_index
         end
       end
@@ -140,14 +140,12 @@ class Tag < ApplicationRecord
     def user_can_change_category?
       cat = TagCategory::REVERSE_MAPPING[category]
       if !CurrentUser.is_admin? && TagCategory::ADMIN_ONLY_MAPPING[cat]
-        errors.add(:category,  "can only used by admins")
+        errors.add(:category, "can only used by admins")
         return false
       end
-      if cat == "lore"
-        unless name =~ /\A.*_\(lore\)\z/
-          errors.add(:category, "can only be applied to tags that end with '_(lore)'")
-          return false
-        end
+      if cat == "lore" && !(name =~ /\A.*_\(lore\)\z/)
+        errors.add(:category, "can only be applied to tags that end with '_(lore)'")
+        false
       end
     end
 
@@ -176,7 +174,7 @@ class Tag < ApplicationRecord
     end
 
     def find_by_name_list(names)
-      names = names.map {|x| [normalize_name(x), nil]}.to_h
+      names = names.map { |x| [normalize_name(x), nil] }.to_h
       existing = Tag.where(name: names.keys).to_a
       existing.each do |x|
         names[x.name] = x
@@ -185,7 +183,7 @@ class Tag < ApplicationRecord
     end
 
     def find_or_create_by_name_list(names, creator: CurrentUser.user)
-      names = names.map {|x| normalize_name(x)}
+      names = names.map { |x| normalize_name(x) }
       names = names.map do |x|
         if x =~ /\A(#{categories.regexp}):(.+)\Z/
           [$2, $1]
@@ -232,10 +230,10 @@ class Tag < ApplicationRecord
       if tag
         if category
           category_id = categories.value_for(category)
-            # in case a category change hasn't propagated to this server yet,
-            # force an update the local cache. This may get overwritten in the
-            # next few lines if the category is changed.
-            tag.update_category_cache
+          # in case a category change hasn't propagated to this server yet,
+          # force an update the local cache. This may get overwritten in the
+          # next few lines if the category is changed.
+          tag.update_category_cache
 
           unless category_id == tag.category
             if tag.category_editable_by_implicit?(creator)
@@ -277,13 +275,7 @@ class Tag < ApplicationRecord
 
     def related_cache_expiry
       base = Math.sqrt([post_count, 0].max)
-      if base > 24 * 30
-        24 * 30
-      elsif base < 24
-        24
-      else
-        base
-      end
+      base.clamp(24, 24 * 30)
     end
 
     def should_update_related?

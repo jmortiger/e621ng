@@ -3,17 +3,18 @@
 require "tmpdir"
 
 class Upload < ApplicationRecord
-  class Error < Exception ; end
+  class Error < Exception; end
 
   attr_accessor :as_pending, :replaced_post, :file, :direct_url, :original_post_id, :locked_tags, :locked_rating, :replacement_id
-  belongs_to :uploader, :class_name => "User"
+
+  belongs_to :uploader, class_name: "User"
   belongs_to :post, optional: true
 
   before_validation :assign_rating_from_tags
   before_validation :fixup_source, on: :create
   validate :uploader_is_not_limited, on: :create
   validate :direct_url_is_whitelisted, on: :create
-  validates :rating, inclusion: { in: %w(q e s) }, allow_nil: false
+  validates :rating, inclusion: { in: %w[q e s] }, allow_nil: false
   validate :md5_is_unique, on: :file
   validate on: :file do |upload|
     FileValidator.new(upload, file.path).validate
@@ -58,16 +59,24 @@ class Upload < ApplicationRecord
       source = source.unicode_normalize(:nfc)
 
       # percent encode unicode characters in urls
-      if source =~ %r!\Ahttps?://!i
-        source = Addressable::URI.normalized_encode(source) rescue source
+      if source =~ %r{\Ahttps?://}i
+        source = begin
+          Addressable::URI.normalized_encode(source)
+        rescue StandardError
+          source
+        end
       end
 
       super(source)
     end
 
     def direct_url_parsed
-      return nil unless direct_url =~ %r!\Ahttps?://!i
-      Addressable::URI.heuristic_parse(direct_url) rescue nil
+      return nil unless direct_url =~ %r{\Ahttps?://}i
+      begin
+        Addressable::URI.heuristic_parse(direct_url)
+      rescue StandardError
+        nil
+      end
     end
   end
 
@@ -79,7 +88,7 @@ class Upload < ApplicationRecord
 
   module SearchMethods
     def pending
-      where(:status => "pending")
+      where(status: "pending")
     end
 
     def post_tags_match(query)
@@ -156,7 +165,7 @@ class Upload < ApplicationRecord
 
     uploadable = uploader.can_upload_with_reason
     if uploadable != true
-      self.errors.add(:uploader, User.upload_reason_string(uploadable))
+      errors.add(:uploader, User.upload_reason_string(uploadable))
       return false
     end
     true
@@ -165,8 +174,8 @@ class Upload < ApplicationRecord
   def direct_url_is_whitelisted
     return true if direct_url_parsed.nil?
     valid, reason = UploadWhitelist.is_whitelisted?(direct_url_parsed)
-    if !valid
-      self.errors.add(:source, "is not whitelisted: #{reason}")
+    unless valid
+      errors.add(:source, "is not whitelisted: #{reason}")
       return false
     end
     true

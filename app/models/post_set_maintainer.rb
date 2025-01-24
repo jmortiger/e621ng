@@ -20,52 +20,52 @@ class PostSetMaintainer < ApplicationRecord
 
 \"Click here\":/post_set_maintainers/#{id}/block to deny the request and prevent yourself from being invited to this set again in the future."
     Dmail.create_automated(
-        to_id: user_id,
-        title: "You were invite to be a maintainer of #{post_set.name}",
-        body: body
+      to_id: user_id,
+      title: "You were invite to be a maintainer of #{post_set.name}",
+      body: body,
     )
   end
 
   def cancel!
-    if status == 'pending'
-      self.status = 'cooldown'
+    if status == "pending"
+      self.status = "cooldown"
       save
       return
     end
 
-    if status == 'approved'
+    if status == "approved"
       body = "\"#{post_set.creator.name}\":/users/#{post_set.creator_id} removed you as a maintainer of the \"#{post_set.name}\":/post_sets/#{post_set.id} set."
       Dmail.create_automated(
-          to_id: user_id,
-          title: "You were removed as a set maintainer of #{post_set.name}",
-          body: body
+        to_id: user_id,
+        title: "You were removed as a set maintainer of #{post_set.name}",
+        body: body,
       )
     end
     destroy
   end
 
   def approve!
-    self.status = 'approved'
+    self.status = "approved"
     save
     Dmail.create_automated(
-        to_id: post_set.creator_id,
-        title: "#{user.name} approved your invite to maintain #{post_set.name}",
-        body: "\"#{user.name}\":/users/#{user_id} approved your invite to maintain \"#{post_set.name}\":/post_sets/#{post_set.id}."
+      to_id: post_set.creator_id,
+      title: "#{user.name} approved your invite to maintain #{post_set.name}",
+      body: "\"#{user.name}\":/users/#{user_id} approved your invite to maintain \"#{post_set.name}\":/post_sets/#{post_set.id}.",
     )
   end
 
   def deny!
     if status == "pending"
       Dmail.create_automated(
-          to_id: post_set.creator_id,
-          title: "#{user.name} denied your invite to maintain #{post_set.name}",
-          body: "\"#{user.name}\":/users/#{user.id} denied your invite to maintain \"#{post_set.name}\":/post_sets/#{post_set.id}."
+        to_id: post_set.creator_id,
+        title: "#{user.name} denied your invite to maintain #{post_set.name}",
+        body: "\"#{user.name}\":/users/#{user.id} denied your invite to maintain \"#{post_set.name}\":/post_sets/#{post_set.id}.",
       )
     elsif status == "approved"
       Dmail.create_automated(
-          to_id: post_set.creator_id,
-          title: "#{user.name} removed themselves as a maintainer of #{post_set.name}",
-          body: "\"#{user.name}\":/users/#{user.id} removed themselves as a maintainer of \"#{post_set.name}\":/post_sets/#{post_set.id}."
+        to_id: post_set.creator_id,
+        title: "#{user.name} removed themselves as a maintainer of #{post_set.name}",
+        body: "\"#{user.name}\":/users/#{user.id} removed themselves as a maintainer of \"#{post_set.name}\":/post_sets/#{post_set.id}.",
       )
     end
     destroy
@@ -74,18 +74,18 @@ class PostSetMaintainer < ApplicationRecord
   def block!
     if status == "approved"
       Dmail.create_automated(
-          to_id: post_set.creator_id,
-          title: "#{user.name} removed themselves as a maintainer of #{post_set.name}",
-          body: "\"#{user.name}\":/users/#{user.id} removed themselves as a maintainer of \"#{post_set.name}\":/post_sets/#{post_set.id} and blocked all future invites."
+        to_id: post_set.creator_id,
+        title: "#{user.name} removed themselves as a maintainer of #{post_set.name}",
+        body: "\"#{user.name}\":/users/#{user.id} removed themselves as a maintainer of \"#{post_set.name}\":/post_sets/#{post_set.id} and blocked all future invites.",
       )
     elsif status == "pending"
       Dmail.create_automated(
-          to_id: post_set.creator_id,
-          title: "#{user.name} denied your invite to maintain #{post_set.name}",
-          body: "\"#{user.name}\":/users/#{user.id} denied your invite to maintain \"#{post_set.name}\":/post_sets/#{post_set.id} and blocked all future invites."
+        to_id: post_set.creator_id,
+        title: "#{user.name} denied your invite to maintain #{post_set.name}",
+        body: "\"#{user.name}\":/users/#{user.id} denied your invite to maintain \"#{post_set.name}\":/post_sets/#{post_set.id} and blocked all future invites.",
       )
     end
-    self.status = 'blocked'
+    self.status = "blocked"
     save
   end
 
@@ -109,34 +109,34 @@ class PostSetMaintainer < ApplicationRecord
       if existing.nil?
         return
       end
-      if ['approved', 'pending'].include?(existing.status)
+      if %w[approved pending].include?(existing.status)
         errors.add(:base, "Already a maintainer of this set")
         return false
       end
-      if existing.status == 'blocked'
-        errors.add(:base, 'User has blocked you from inviting them to maintain this set')
+      if existing.status == "blocked"
+        errors.add(:base, "User has blocked you from inviting them to maintain this set")
         return false
       end
-      if existing.status == 'cooldown' && existing.created_at > 24.hours.ago
+      if existing.status == "cooldown" && existing.created_at > 24.hours.ago
         errors.add(:base, "User has been invited to maintain this set too recently")
-        return false
+        false
       end
     end
 
     def ensure_set_public
       unless post_set.is_public
-        errors.add(:post_set, 'must be public')
+        errors.add(:post_set, "must be public")
         false
       end
     end
   end
 
   def self.active
-    where(status: 'approved')
+    where(status: "approved")
   end
 
   def self.pending
-    where(status: 'pending')
+    where(status: "pending")
   end
 
   include ValidaitonMethods

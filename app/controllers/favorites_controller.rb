@@ -8,7 +8,7 @@ class FavoritesController < ApplicationController
 
   def index
     if params[:tags]
-      redirect_to(posts_path(:tags => params[:tags]))
+      redirect_to(posts_path(tags: params[:tags]))
     else
       user_id = params[:user_id] || CurrentUser.user.id
       @user = User.find(user_id)
@@ -20,7 +20,7 @@ class FavoritesController < ApplicationController
       @favorite_set = PostSets::Favorites.new(@user, params[:page], limit: params[:limit])
       respond_with(@favorite_set.posts) do |fmt|
         fmt.json do
-          render json: @favorite_set.api_posts, root: 'posts'
+          render json: @favorite_set.api_posts, root: "posts"
         end
       end
     end
@@ -32,8 +32,8 @@ class FavoritesController < ApplicationController
     flash.now[:notice] = "You have favorited this post"
 
     respond_with(@post)
-  rescue Favorite::Error, ActiveRecord::RecordInvalid => x
-    render_expected_error(422, x.message)
+  rescue Favorite::Error, ActiveRecord::RecordInvalid => e
+    render_expected_error(422, e.message)
   end
 
   def destroy
@@ -42,8 +42,8 @@ class FavoritesController < ApplicationController
 
     flash.now[:notice] = "You have unfavorited this post"
     respond_with(@post)
-  rescue Favorite::Error => x
-    render_expected_error(422, x.message)
+  rescue Favorite::Error => e
+    render_expected_error(422, e.message)
   end
 
   def ensure_lockdown_disabled

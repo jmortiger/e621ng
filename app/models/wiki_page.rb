@@ -1,14 +1,17 @@
 # frozen_string_literal: true
 
 class WikiPage < ApplicationRecord
-  class RevertError < Exception ; end
+  class RevertError < Exception; end
 
   before_validation :normalize_title
   before_validation :normalize_other_names
   before_validation :normalize_parent
+  before_save :log_changes
+  before_destroy :validate_not_used_as_help_page
+  before_destroy :log_destroy
   after_save :create_version
   normalizes :body, with: ->(body) { body.gsub("\r\n", "\n") }
-  validates :title, uniqueness: { :case_sensitive => false }
+  validates :title, uniqueness: { case_sensitive: false }
   validates :title, presence: true
   validates :title, tag_name: true, if: :title_changed?
   validates :body, presence: { unless: -> { is_deleted? || other_names.present? || parent.present? } }
@@ -19,12 +22,10 @@ class WikiPage < ApplicationRecord
   validate :validate_redirect
   validate :validate_not_locked
 
-  before_destroy :validate_not_used_as_help_page
-  before_destroy :log_destroy
-  before_save :log_changes
   after_save :update_help_page, if: :saved_change_to_title?
 
   attr_accessor :skip_secondary_validations, :edit_reason
+
   array_attribute :other_names
   belongs_to_creator
   belongs_to_updater
@@ -34,15 +35,15 @@ class WikiPage < ApplicationRecord
   has_one :help_page, foreign_key: "wiki_page", primary_key: "title"
 
   def log_destroy
-    ModAction.log(:wiki_page_delete, {wiki_page: title, wiki_page_id: id})
+    ModAction.log(:wiki_page_delete, { wiki_page: title, wiki_page_id: id })
   end
 
   def log_changes
     if title_changed? && !new_record?
-      ModAction.log(:wiki_page_rename, {new_title: title, old_title: title_was})
+      ModAction.log(:wiki_page_rename, { new_title: title, old_title: title_was })
     end
     if is_locked_changed?
-      ModAction.log(is_locked ? :wiki_page_lock : :wiki_page_unlock, {wiki_page: title})
+      ModAction.log(is_locked ? :wiki_page_lock : :wiki_page_unlock, { wiki_page: title })
     end
   end
 
@@ -123,7 +124,7 @@ class WikiPage < ApplicationRecord
 
   module ApiMethods
     def method_attributes
-      super + [:creator_name, :category_id]
+      super + %i[creator_name category_id]
     end
   end
 
@@ -156,7 +157,7 @@ class WikiPage < ApplicationRecord
   def validate_not_locked
     if is_locked? && !CurrentUser.is_janitor?
       errors.add(:is_locked, "and cannot be updated")
-      return false
+      false
     end
   end
 
@@ -231,7 +232,7 @@ class WikiPage < ApplicationRecord
   end
 
   def pretty_title
-    title&.tr("_", " ") || ''
+    title&.tr("_", " ") || ""
   end
 
   def pretty_title_with_category
@@ -274,7 +275,7 @@ class WikiPage < ApplicationRecord
       else
         match
       end
-    end.map {|x| x.downcase.tr(" ", "_").to_s}.uniq
+    end.map { |x| x.downcase.tr(" ", "_").to_s }.uniq
   end
 
   def visible?

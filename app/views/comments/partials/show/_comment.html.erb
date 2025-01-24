@@ -48,11 +48,11 @@
             <% end %>
             <% if CurrentUser.is_member? && !comment.is_sticky %>
               <li>|</li>
-              <li><%= link_to "Report", new_ticket_path(disp_id: comment.id, qtype: 'comment') %></li>
+              <li><%= link_to "Report", new_ticket_path(disp_id: comment.id, qtype: "comment") %></li>
             <% end %>
             <% if CurrentUser.is_moderator? %>
               <li>|</li>
-              <li><%= link_to "Show Edits", edit_history_path(id: comment.id, type: 'Comment') %></li>
+              <li><%= link_to "Show Edits", edit_history_path(id: comment.id, type: "Comment") %></li>
               <%= render "user_warnable/buttons", model: comment %>
             <% end %>
             <% if CurrentUser.is_admin? %>

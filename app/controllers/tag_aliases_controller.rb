@@ -1,8 +1,13 @@
 # frozen_string_literal: true
 
 class TagAliasesController < ApplicationController
-  before_action :admin_only, except: [:index, :show, :destroy]
+  before_action :admin_only, except: %i[index show destroy]
   respond_to :html, :json, :js
+
+  def index
+    @tag_aliases = TagAlias.includes(:antecedent_tag, :consequent_tag, :approver).search(search_params).paginate(params[:page], limit: params[:limit])
+    respond_with(@tag_aliases)
+  end
 
   def show
     @tag_alias = TagAlias.find(params[:id])
@@ -25,11 +30,6 @@ class TagAliasesController < ApplicationController
     end
 
     respond_with(@tag_alias)
-  end
-
-  def index
-    @tag_aliases = TagAlias.includes(:antecedent_tag, :consequent_tag, :approver).search(search_params).paginate(params[:page], :limit => params[:limit])
-    respond_with(@tag_aliases)
   end
 
   def destroy

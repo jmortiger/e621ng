@@ -14,8 +14,6 @@ module PostsHelper
     current_page = (params[:page] || 1).to_i
     if current_page >= 2
       url_for(nav_params_for(current_page - 1)).html_safe
-    else
-      nil
     end
   end
 
@@ -47,10 +45,10 @@ module PostsHelper
     if sibling_count > 0
       html << " that has "
       text = sibling_count == 1 ? "a sibling" : "#{sibling_count} siblings"
-      html << link_to(text, posts_path(:tags => "parent:#{post.parent_id}"))
+      html << link_to(text, posts_path(tags: "parent:#{post.parent_id}"))
     end
 
-    html << " (#{link_to("learn more", wiki_pages_path(:title => "e621:post_relationships"))}) "
+    html << " (#{link_to('learn more', wiki_pages_path(title: 'e621:post_relationships'))}) "
 
     html << link_to("show »", "#", id: "has-parent-relationship-preview-link")
 
@@ -62,9 +60,9 @@ module PostsHelper
 
     html << "Children: "
     text = children_post_set.children.count == 1 ? "1 child" : "#{children_post_set.children.count} children"
-    html << link_to(text, posts_path(:tags => "parent:#{post.id}"))
+    html << link_to(text, posts_path(tags: "parent:#{post.id}"))
 
-    html << " (#{link_to("learn more", wiki_pages_path(:title => "e621:post_relationships"))}) "
+    html << " (#{link_to('learn more', wiki_pages_path(title: 'e621:post_relationships'))}) "
 
     html << link_to("show »", "#", id: "has-children-relationship-preview-link")
 
@@ -75,14 +73,14 @@ module PostsHelper
     return false if params.has_key?(:q)
     return false if params.has_key?(:post_set_id)
     return false unless params.has_key?(:pool_id)
-    return params[:pool_id].to_i == pool.id
+    params[:pool_id].to_i == pool.id
   end
 
   def is_post_set_selected?(post_set)
     return false if params.has_key?(:q)
     return false if params.has_key?(:pool_id)
     return false unless params.has_key?(:post_set_id)
-    return params[:post_set_id].to_i == post_set.id
+    params[:post_set_id].to_i == post_set.id
   end
 
   def post_stats_section(post)
@@ -107,19 +105,19 @@ module PostsHelper
     negative = user.negative_feedback_count
 
     return "" if (positive + neutral + negative) == 0
-    positive_html = %{<span class="user-feedback-positive">#{positive}</span>}.html_safe if positive > 0
-    neutral_html = %{<span class="user-feedback-neutral">#{neutral}</span>}.html_safe if neutral > 0
-    negative_html = %{<span class="user-feedback-negative">#{negative}</span>}.html_safe if negative > 0
+    positive_html = %(<span class="user-feedback-positive">#{positive}</span>).html_safe if positive > 0
+    neutral_html = %(<span class="user-feedback-neutral">#{neutral}</span>).html_safe if neutral > 0
+    negative_html = %(<span class="user-feedback-negative">#{negative}</span>).html_safe if negative > 0
     list_html = "#{positive_html} #{neutral_html} #{negative_html}".strip
 
-    link_to(%{(#{list_html})}.html_safe,  user_feedbacks_path(search: { user_id: user.id}))
+    link_to(%{(#{list_html})}.html_safe, user_feedbacks_path(search: { user_id: user.id }))
   end
 
   private
 
   def nav_params_for(page)
     query_params = params.except(:controller, :action, :id).merge(page: page).permit!
-    {params: query_params}
+    { params: query_params }
   end
 
   def pretty_html_rating(post)
@@ -154,21 +152,21 @@ module PostsHelper
   end
 
   def score_class(score)
-    return 'score-neutral' if score == 0
-    score > 0 ? 'score-positive' : 'score-negative'
+    return "score-neutral" if score == 0
+    score > 0 ? "score-positive" : "score-negative"
   end
 
   def confirm_score_class(score, want, buttons)
-    base = buttons ? 'button ' : ''
-    return base + 'score-neutral' if score != want || score == 0
+    base = buttons ? "button " : ""
+    return base + "score-neutral" if score != want || score == 0
     base + score_class(score)
   end
 
   def rating_collection
     [
-      ["Safe", "s"],
-      ["Questionable", "q"],
-      ["Explicit", "e"]
+      %w[Safe s],
+      %w[Questionable q],
+      %w[Explicit e],
     ]
   end
 end

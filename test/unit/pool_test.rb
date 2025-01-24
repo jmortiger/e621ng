@@ -123,7 +123,7 @@ class PoolTest < ActiveSupport::TestCase
 
       context "by #attributes=" do
         setup do
-          @pool.attributes = {post_ids: [@p1.id, @p2.id]}
+          @pool.attributes = { post_ids: [@p1.id, @p2.id] }
           @pool.synchronize
           @pool.save
         end
@@ -270,10 +270,10 @@ class PoolTest < ActiveSupport::TestCase
     end
 
     should "normalize its name" do
-      @pool.update(:name => "  A  B  ")
+      @pool.update(name: "  A  B  ")
       assert_equal("A_B", @pool.name)
 
-      @pool.update(:name => "__A__B__")
+      @pool.update(name: "__A__B__")
       assert_equal("A_B", @pool.name)
     end
 

@@ -7,7 +7,7 @@ module Maintenance
     class PasswordResetsControllerTest < ActionDispatch::IntegrationTest
       context "A password resets controller" do
         setup do
-          @user = create(:user, :email => "abc@com.net")
+          @user = create(:user, email: "abc@com.net")
           ActionMailer::Base.delivery_method = :test
           ActionMailer::Base.deliveries.clear
         end
@@ -20,7 +20,7 @@ module Maintenance
         context "create action" do
           context "given invalid parameters" do
             setup do
-              post maintenance_user_password_reset_path, params: {:nonce => {:email => ""}}
+              post maintenance_user_password_reset_path, params: { nonce: { email: "" } }
             end
 
             should "not create a new nonce" do
@@ -58,7 +58,7 @@ module Maintenance
         context "edit action" do
           context "with invalid parameters" do
             setup do
-              get edit_maintenance_user_password_reset_path, params: {:email => "a@b.c"}
+              get edit_maintenance_user_password_reset_path, params: { email: "a@b.c" }
             end
 
             should "succeed silently" do
@@ -71,7 +71,7 @@ module Maintenance
               @user = create(:user)
               @nonce = create(:user_password_reset_nonce, user: @user)
               ActionMailer::Base.deliveries.clear
-              get edit_maintenance_user_password_reset_path, params: {uid: @user.id, key: @nonce.key}
+              get edit_maintenance_user_password_reset_path, params: { uid: @user.id, key: @nonce.key }
             end
 
             should "succeed" do

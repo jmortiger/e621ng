@@ -3,7 +3,7 @@
 class StorageManager
   class Error < StandardError; end
 
-  DEFAULT_BASE_DIR = "#{Rails.root}/public/data"
+  DEFAULT_BASE_DIR = "#{Rails.public_path.join('data')}"
   IMAGE_TYPES = %i[preview large crop original]
   MASCOT_PREFIX = "mascots"
 
@@ -57,7 +57,7 @@ class StorageManager
     store(io, replacement_path(replacement.storage_id, replacement.file_ext, image_size))
   end
 
-  def delete_file(post_id, md5, file_ext, type, scale_factor: nil)
+  def delete_file(_post_id, md5, file_ext, type, scale_factor: nil)
     delete(file_path(md5, file_ext, type, scale_factor: scale_factor))
     delete(file_path(md5, file_ext, type, true, scale_factor: scale_factor))
   end
@@ -69,13 +69,13 @@ class StorageManager
       delete(file_path(md5, file_ext, type, true))
     end
     Danbooru.config.video_rescales.each_key do |k|
-      ['mp4','webm'].each do |ext|
+      %w[mp4 webm].each do |ext|
         delete(file_path(md5, ext, :scaled, false, scale_factor: k.to_s))
         delete(file_path(md5, ext, :scaled, true, scale_factor: k.to_s))
       end
     end
-    delete(file_path(md5, 'mp4', :original, false))
-    delete(file_path(md5, 'mp4', :original, true))
+    delete(file_path(md5, "mp4", :original, false))
+    delete(file_path(md5, "mp4", :original, true))
   end
 
   def delete_replacement(replacement)
@@ -95,11 +95,11 @@ class StorageManager
     raise NotImplementedError, "move_file_undelete not implemented"
   end
 
-  def protected_params(url, post, secret: Danbooru.config.protected_file_secret)
+  def protected_params(url, _post, secret: Danbooru.config.protected_file_secret)
     user_id = CurrentUser.id
-    time = (Time.now + 15.minute).to_i
+    time = (Time.now + 15.minutes).to_i
     secret = secret
-    hmac = Digest::MD5.base64digest("#{time} #{url} #{user_id} #{secret}").tr("+/","-_").gsub("==",'')
+    hmac = Digest::MD5.base64digest("#{time} #{url} #{user_id} #{secret}").tr("+/", "-_").gsub("==", "")
     "?auth=#{hmac}&expires=#{time}&uid=#{user_id}"
   end
 
@@ -145,7 +145,7 @@ class StorageManager
     origin
   end
 
-  def file_path(post_or_md5, file_ext, type, protected=false, scale_factor: nil)
+  def file_path(post_or_md5, file_ext, type, protected = false, scale_factor: nil)
     md5 = post_or_md5.is_a?(String) ? post_or_md5 : post_or_md5.md5
     subdir = subdir_for(md5)
     file = file_name(md5, file_ext, type, scale_factor: scale_factor)

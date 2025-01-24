@@ -16,7 +16,20 @@ class ForumCategoriesController < ApplicationController
       ModAction.log(:forum_category_create, { forum_category_id: @cat.id })
       flash[:notice] = "Category created"
     else
-      flash[:notice] = @cat.errors.full_messages.join('; ')
+      flash[:notice] = @cat.errors.full_messages.join("; ")
+    end
+    redirect_to forum_categories_path
+  end
+
+  def update
+    @cat = ForumCategory.find(params[:id])
+    @cat.update(category_params)
+
+    if @cat.valid?
+      ModAction.log(:forum_category_update, { forum_category_id: @cat.id })
+      flash[:notice] = "Category updated"
+    else
+      flash[:notice] = @cat.errors.full_messages.join("; ")
     end
     redirect_to forum_categories_path
   end
@@ -32,22 +45,9 @@ class ForumCategoriesController < ApplicationController
     end
   end
 
-  def update
-    @cat = ForumCategory.find(params[:id])
-    @cat.update(category_params)
-
-    if @cat.valid?
-      ModAction.log(:forum_category_update, { forum_category_id: @cat.id })
-      flash[:notice] = "Category updated"
-    else
-      flash[:notice] = @cat.errors.full_messages.join('; ')
-    end
-    redirect_to forum_categories_path
-  end
-
   private
 
   def category_params
-    params.require(:forum_category).permit([:name, :description, :can_create, :can_reply, :can_view, :cat_order])
+    params.require(:forum_category).permit(%i[name description can_create can_reply can_view cat_order])
   end
 end

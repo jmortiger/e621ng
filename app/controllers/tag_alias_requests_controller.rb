@@ -12,7 +12,7 @@ class TagAliasRequestsController < ApplicationController
     @tag_alias_request.create
 
     if @tag_alias_request.invalid?
-      render :action => "new"
+      render action: "new"
     elsif @tag_alias_request.forum_topic
       redirect_to forum_topic_path(@tag_alias_request.forum_topic)
     else

@@ -45,8 +45,8 @@ class Blip < ApplicationRecord
   end
 
   def validate_parent_exists
-    if response_to.present?
-      errors.add(:response_to, "must exist") unless Blip.exists?(response_to)
+    if response_to.present? && !Blip.exists?(response_to)
+      errors.add(:response_to, "must exist")
     end
   end
 
@@ -80,7 +80,7 @@ class Blip < ApplicationRecord
       if user.is_moderator?
         all
       else
-        where('is_hidden = ?', false)
+        where("is_hidden = ?", false)
       end
     end
 
@@ -96,7 +96,7 @@ class Blip < ApplicationRecord
       q = q.attribute_matches(:body, params[:body_matches])
 
       if params[:response_to].present?
-        q = q.where('response_to = ?', params[:response_to].to_i)
+        q = q.where("response_to = ?", params[:response_to].to_i)
       end
 
       q = q.where_user(:creator_id, :creator, params)

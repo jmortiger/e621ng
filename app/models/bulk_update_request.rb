@@ -10,8 +10,8 @@ class BulkUpdateRequest < ApplicationRecord
 
   validates :user, presence: true
   validates :script, presence: true
-  validates :title, presence: { if: ->(rec) {rec.forum_topic_id.blank?} }
-  validates :status, inclusion: { :in => %w(pending approved rejected) }
+  validates :title, presence: { if: ->(rec) { rec.forum_topic_id.blank? } }
+  validates :status, inclusion: { in: %w[pending approved rejected] }
   validate :script_formatted_correctly
   validate :forum_topic_id_not_invalid
   validate :validate_script, on: :create
@@ -22,7 +22,7 @@ class BulkUpdateRequest < ApplicationRecord
   after_create :create_forum_topic
 
   scope :pending_first, -> { order(Arel.sql("(case status when 'pending' then 0 when 'approved' then 1 else 2 end)")) }
-  scope :pending, -> {where(status: "pending")}
+  scope :pending, -> { where(status: "pending") }
 
   module ApiMethods
     def hidden_attributes
@@ -78,15 +78,13 @@ class BulkUpdateRequest < ApplicationRecord
     def forum_updater
       @forum_updater ||= begin
         post = if forum_topic
-          forum_post || forum_topic.posts.first
-        else
-          nil
-        end
+                 forum_post || forum_topic.posts.first
+               end
         ForumUpdater.new(
           forum_topic,
           forum_post: post,
           expected_title: title,
-          skip_update: !TagRelationship::SUPPORT_HARD_CODED
+          skip_update: !TagRelationship::SUPPORT_HARD_CODED,
         )
       end
     end
@@ -99,13 +97,12 @@ class BulkUpdateRequest < ApplicationRecord
           forum_updater.update("The #{bulk_update_request_link} (forum ##{forum_post&.id}) has been approved by @#{approver.name}.", "APPROVED")
         end
       end
-
-    rescue BulkUpdateRequestImporter::Error => x
+    rescue BulkUpdateRequestImporter::Error => e
       self.approver = approver
       CurrentUser.scoped(approver) do
-        forum_updater.update("The #{bulk_update_request_link} (forum ##{forum_post&.id}) has failed: #{x.to_s}", "FAILED")
+        forum_updater.update("The #{bulk_update_request_link} (forum ##{forum_post&.id}) has failed: #{e}", "FAILED")
       end
-      self.errors.add(:base, x.to_s)
+      errors.add(:base, e.to_s)
     end
 
     def create_forum_topic
@@ -114,7 +111,7 @@ class BulkUpdateRequest < ApplicationRecord
         forum_post = forum_topic.posts.create(body: reason_with_link)
         update(forum_post_id: forum_post.id)
       else
-        forum_topic = ForumTopic.create(title: title, category_id: Danbooru.config.alias_implication_forum_category, original_post_attributes: {body: reason_with_link})
+        forum_topic = ForumTopic.create(title: title, category_id: Danbooru.config.alias_implication_forum_category, original_post_attributes: { body: reason_with_link })
         update(forum_topic_id: forum_topic.id, forum_post_id: forum_topic.posts.first.id)
       end
     end
@@ -134,10 +131,10 @@ class BulkUpdateRequest < ApplicationRecord
   module ValidationMethods
     def script_formatted_correctly
       BulkUpdateRequestImporter.tokenize(script)
-      return true
+      true
     rescue StandardError => e
       errors.add(:base, e.message)
-      return false
+      false
     end
 
     def forum_topic_id_not_invalid
@@ -193,8 +190,8 @@ class BulkUpdateRequest < ApplicationRecord
   end
 
   def initialize_attributes
-    self.user_id = CurrentUser.user.id unless self.user_id
-    self.user_ip_addr = CurrentUser.ip_addr unless self.user_ip_addr
+    self.user_id = CurrentUser.user.id unless user_id
+    self.user_ip_addr = CurrentUser.ip_addr unless user_ip_addr
     self.status = "pending"
   end
 

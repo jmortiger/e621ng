@@ -6,7 +6,7 @@ module Moderator
       class ModAction
         def self.all
           ModActionDecorator.decorate_collection(
-              ::ModAction.includes(:creator).order("id desc").limit(10)
+            ::ModAction.includes(:creator).order("id desc").limit(10),
           )
         end
       end

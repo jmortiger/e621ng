@@ -11,9 +11,7 @@ def get_cache_store
 end
 
 Rails.application.configure do
-  begin
-    config.cache_store = get_cache_store
-    config.action_controller.cache_store = get_cache_store
-    Rails.cache = ActiveSupport::Cache.lookup_store(Rails.application.config.cache_store)
-  end
+  config.cache_store = get_cache_store
+  config.action_controller.cache_store = get_cache_store
+  Rails.cache = ActiveSupport::Cache.lookup_store(Rails.application.config.cache_store)
 end

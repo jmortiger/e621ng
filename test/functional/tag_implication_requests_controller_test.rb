@@ -25,11 +25,11 @@ class TagImplicationRequestsControllerTest < ActionDispatch::IntegrationTest
 
       should "create a pending implication" do
         params = {
-          :tag_implication_request => {
-            :antecedent_name => "foo",
-            :consequent_name => "bar",
-            :reason => "blah blah"
-          }
+          tag_implication_request: {
+            antecedent_name: "foo",
+            consequent_name: "bar",
+            reason: "blah blah",
+          },
         }
 
         assert_difference("ForumTopic.count") do

@@ -9,13 +9,6 @@ class TakedownsController < ApplicationController
     respond_with(@takedowns)
   end
 
-  def destroy
-    @takedown = Takedown.find(params[:id])
-    @takedown.destroy
-    ModAction.log(:takedown_delete, { takedown_id: @takedown.id })
-    respond_with(@takedown)
-  end
-
   def show
     @takedown = Takedown.find(params[:id])
     @show_instructions = (CurrentUser.ip_addr == @takedown.creator_ip_addr) || (@takedown.vericode == params[:code])
@@ -49,11 +42,18 @@ class TakedownsController < ApplicationController
     @takedown.apply_posts(params[:takedown_posts])
     @takedown.save
     if @takedown.valid?
-      flash[:notice] = 'Takedown request updated'
+      flash[:notice] = "Takedown request updated"
       if params[:process_takedown].to_s.truthy?
         @takedown.process!(CurrentUser.user, params[:delete_reason])
       end
     end
+    respond_with(@takedown)
+  end
+
+  def destroy
+    @takedown = Takedown.find(params[:id])
+    @takedown.destroy
+    ModAction.log(:takedown_delete, { takedown_id: @takedown.id })
     respond_with(@takedown)
   end
 
@@ -62,7 +62,7 @@ class TakedownsController < ApplicationController
     added = @takedown.add_posts_by_ids!(params[:post_ids])
     respond_with(@takedown) do |fmt|
       fmt.json do
-        render json: {added_count: added.size, added_post_ids: added}
+        render json: { added_count: added.size, added_post_ids: added }
       end
     end
   end
@@ -72,14 +72,14 @@ class TakedownsController < ApplicationController
     added = @takedown.add_posts_by_tags!(params[:post_tags])
     respond_with(@takedown) do |fmt|
       fmt.json do
-        render json: {added_count: added.size, added_post_ids: added}
+        render json: { added_count: added.size, added_post_ids: added }
       end
     end
   end
 
   def count_matching_posts
     post_count = Post.tag_match_system(params[:post_tags]).count_only
-    render json: {matched_post_count: post_count}
+    render json: { matched_post_count: post_count }
   end
 
   def remove_by_ids

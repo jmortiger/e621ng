@@ -3,7 +3,7 @@
 require "test_helper"
 
 class StorageManagerTest < ActiveSupport::TestCase
-  BASE_DIR = "#{Rails.root}/tmp/test-storage"
+  BASE_DIR = "#{Rails.root.join('tmp/test-storage')}"
 
   context "StorageManager::Match" do
     setup do
@@ -12,7 +12,7 @@ class StorageManagerTest < ActiveSupport::TestCase
           "crop"
         end
 
-        matcher.add_manager(type: [:large, :original]) do
+        matcher.add_manager(type: %i[large original]) do
           "large or original"
         end
 
@@ -134,7 +134,7 @@ class StorageManagerTest < ActiveSupport::TestCase
       @post1 = build(:post, id: 1, file_ext: "png")
       @post2 = build(:post, id: 2, file_ext: "png")
 
-      @storage_manager = StorageManager::Hybrid.new do |id, md5, file_ext, type|
+      @storage_manager = StorageManager::Hybrid.new do |id, _md5, _file_ext, _type|
         if id.odd?
           StorageManager::Local.new(base_dir: "#{BASE_DIR}/i1", base_url: "/i1")
         else

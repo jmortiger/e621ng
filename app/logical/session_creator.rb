@@ -25,9 +25,9 @@ class SessionCreator
         verifier = ActiveSupport::MessageVerifier.new(Danbooru.config.remember_key, serializer: JSON, digest: "SHA256")
         cookies.encrypted[:remember] = { value: verifier.generate("#{user.id}:#{user.password_token}", purpose: "rbr", expires_in: 14.days), expires: Time.now + 14.days, httponly: true, same_site: :lax, secure: Rails.env.production? }
       end
-      return true
+      true
     else
-      return false
+      false
     end
   end
 end

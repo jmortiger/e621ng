@@ -32,7 +32,7 @@ class TagNameValidator < ActiveModel::EachValidator
       record.errors.add(attribute, "'#{value}' cannot contain consecutive underscores, hyphens or tildes")
     when /[^[:graph:]]/
       record.errors.add(attribute, "'#{value}' cannot contain non-printable characters")
-    when /\A[-~+_`(){}\[\]\/]/
+    when %r{\A[-~+_`(){}\[\]/]}
       record.errors.add(attribute, "'#{value}' cannot begin with a '#{value[0]}'")
     when /\A(#{TagQuery::METATAGS.join('|')}):(.+)\z/i
       record.errors.add(attribute, "'#{value}' cannot begin with '#{$1}:'")

@@ -28,18 +28,18 @@ class PostVersion < ApplicationRecord
   include PostVersionIndex
 
   def self.queue(post)
-    self.create({
-                    post_id: post.id,
-                    rating: post.rating,
-                    parent_id: post.parent_id,
-                    source: post.source,
-                    updater_id: CurrentUser.id,
-                    updater_ip_addr: CurrentUser.ip_addr,
-                    tags: post.tag_string,
-                    locked_tags: post.locked_tags,
-                    description: post.description,
-                    reason: post.edit_reason
-                })
+    create({
+      post_id: post.id,
+      rating: post.rating,
+      parent_id: post.parent_id,
+      source: post.source,
+      updater_id: CurrentUser.id,
+      updater_ip_addr: CurrentUser.ip_addr,
+      tags: post.tag_string,
+      locked_tags: post.locked_tags,
+      description: post.description,
+      reason: post.edit_reason,
+    })
   end
 
   def self.calculate_version(post_id)
@@ -47,7 +47,7 @@ class PostVersion < ApplicationRecord
   end
 
   def fill_version
-    self.version = PostVersion.calculate_version (self.post_id)
+    self.version = PostVersion.calculate_version(post_id)
   end
 
   def fill_changes(prev = nil)
@@ -111,10 +111,10 @@ class PostVersion < ApplicationRecord
     added_sources = new_sources - old_sources
     removed_sources = old_sources - new_sources
 
-    return {
-        :added_sources => added_sources,
-        :unchanged_sources => new_sources & old_sources,
-        :removed_sources => removed_sources
+    {
+      added_sources: added_sources,
+      unchanged_sources: new_sources & old_sources,
+      removed_sources: removed_sources,
     }
   end
 
@@ -134,15 +134,15 @@ class PostVersion < ApplicationRecord
     added_locked = new_locked - old_locked
     removed_locked = old_locked - new_locked
 
-    return {
-        added_tags: added_tags,
-        removed_tags: removed_tags,
-        obsolete_added_tags: added_tags - latest_tags,
-        obsolete_removed_tags: removed_tags & latest_tags,
-        unchanged_tags: new_tags & old_tags,
-        added_locked_tags: added_locked,
-        removed_locked_tags: removed_locked,
-        unchanged_locked_tags: new_locked & old_locked
+    {
+      added_tags: added_tags,
+      removed_tags: removed_tags,
+      obsolete_added_tags: added_tags - latest_tags,
+      obsolete_removed_tags: removed_tags & latest_tags,
+      unchanged_tags: new_tags & old_tags,
+      added_locked_tags: added_locked,
+      removed_locked_tags: removed_locked,
+      unchanged_locked_tags: new_locked & old_locked,
     }
   end
 

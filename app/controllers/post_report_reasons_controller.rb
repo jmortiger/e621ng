@@ -4,9 +4,8 @@ class PostReportReasonsController < ApplicationController
   respond_to :html
   before_action :admin_only
 
-
   def index
-    @reasons = PostReportReason.order('id DESC')
+    @reasons = PostReportReason.order("id DESC")
     respond_with(@reasons)
   end
 
@@ -14,26 +13,17 @@ class PostReportReasonsController < ApplicationController
     @reason = PostReportReason.new
   end
 
-  def destroy
+  def edit
     @reason = PostReportReason.find(params[:id])
-    PostReportReason.transaction do
-      @reason.destroy
-      ModAction.log(:report_reason_delete, {reason: @reason.reason, user_id: @reason.creator_id})
-    end
-    respond_with(@reason)
   end
 
   def create
     PostReportReason.transaction do
       @reason = PostReportReason.create(reason_params)
-      ModAction.log(:report_reason_create, {reason: @reason.reason})
+      ModAction.log(:report_reason_create, { reason: @reason.reason })
     end
     flash[:notice] = @reason.valid? ? "Post report reason created" : @reason.errors.full_messages.join("; ")
     redirect_to post_report_reasons_path
-  end
-
-  def edit
-    @reason = PostReportReason.find(params[:id])
   end
 
   def update
@@ -44,6 +34,15 @@ class PostReportReasonsController < ApplicationController
     end
     flash[:notice] = @reason.valid? ? "Post report reason updated" : @reason.errors.full_messages.join("; ")
     redirect_to post_report_reasons_path
+  end
+
+  def destroy
+    @reason = PostReportReason.find(params[:id])
+    PostReportReason.transaction do
+      @reason.destroy
+      ModAction.log(:report_reason_delete, { reason: @reason.reason, user_id: @reason.creator_id })
+    end
+    respond_with(@reason)
   end
 
   private

@@ -2,13 +2,13 @@
   <div id="a-show">
     <div id="blip" class="response-list">
       <% unless params[:page].to_i > 1 %>
-        <%= render partial: "blips/partials/show/blip", locals: {blip: @blip} %>
+        <%= render partial: "blips/partials/show/blip", locals: { blip: @blip } %>
       <% end %>
       <h4>Responses</h4>
       <% unless @children.nil? %>
         <% @children.each do |c| %>
           <% next unless c.visible_to?(CurrentUser.user) %>
-          <%= render partial: "blips/partials/show/blip", locals: {blip: c} %>
+          <%= render partial: "blips/partials/show/blip", locals: { blip: c } %>
         <% end %>
       <% end %>
     </div>

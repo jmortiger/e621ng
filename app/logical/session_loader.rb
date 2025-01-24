@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class SessionLoader
-  class AuthenticationFailure < Exception ; end
+  class AuthenticationFailure < Exception; end
 
   attr_reader :session, :cookies, :request, :params
 
@@ -59,25 +59,23 @@ class SessionLoader
   end
 
   def load_remember_token
-    begin
-      message = @remember_validator.verify(cookies.encrypted[:remember], purpose: "rbr")
-      return if message.nil?
-      pieces = message.split(":")
-      return unless pieces.length == 2
-      user = User.find_by_id(pieces[0].to_i)
-      return unless user
-      return if pieces[1].to_i != user.password_token
-      CurrentUser.user = user
-      session[:user_id] = user.id
-      session[:ph] = user.password_token # This has been validated by the remember token
-    rescue
-      return
-    end
+    message = @remember_validator.verify(cookies.encrypted[:remember], purpose: "rbr")
+    return if message.nil?
+    pieces = message.split(":")
+    return unless pieces.length == 2
+    user = User.find_by_id(pieces[0].to_i)
+    return unless user
+    return if pieces[1].to_i != user.password_token
+    CurrentUser.user = user
+    session[:user_id] = user.id
+    session[:ph] = user.password_token # This has been validated by the remember token
+  rescue StandardError
+    nil
   end
 
   def refresh_old_remember_token
     if cookies.encrypted[:remember] && !CurrentUser.is_anonymous?
-      cookies.encrypted[:remember] = {value: @remember_validator.generate("#{CurrentUser.id}:#{CurrentUser.password_token}", purpose: "rbr", expires_in: 14.days), expires: Time.now + 14.days, httponly: true, same_site: :lax, secure: Rails.env.production?}
+      cookies.encrypted[:remember] = { value: @remember_validator.generate("#{CurrentUser.id}:#{CurrentUser.password_token}", purpose: "rbr", expires_in: 14.days), expires: Time.now + 14.days, httponly: true, same_site: :lax, secure: Rails.env.production? }
     end
   end
 
@@ -92,7 +90,7 @@ class SessionLoader
   end
 
   def authenticate_basic_auth
-    credentials = ::Base64.decode64(request.authorization.split(' ', 2).last || '')
+    credentials = ::Base64.decode64(request.authorization.split(" ", 2).last || "")
     login, api_key = credentials.split(":", 2)
     authenticate_api_key(login, api_key)
   end

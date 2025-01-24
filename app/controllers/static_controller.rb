@@ -43,12 +43,10 @@ class StaticController < ApplicationController
       user = CurrentUser.user
       user.disable_responsive_mode = !user.disable_responsive_mode
       user.save
+    elsif cookies[:nmm]
+      cookies.delete(:nmm)
     else
-      if cookies[:nmm]
-        cookies.delete(:nmm)
-      else
-        cookies.permanent[:nmm] = '1'
-      end
+      cookies.permanent[:nmm] = "1"
     end
     redirect_back fallback_location: posts_path
   end
@@ -59,7 +57,7 @@ class StaticController < ApplicationController
       return
     end
     if request.post?
-      time = (Time.now + 5.minute).to_i
+      time = (Time.now + 5.minutes).to_i
       secret = Danbooru.config.discord_secret
       # TODO: Proper HMAC
       hashed_values = Digest::SHA256.hexdigest("#{CurrentUser.name} #{CurrentUser.id} #{time} #{secret}")
