@@ -520,7 +520,6 @@ Layout/SpaceInsideHashLiteralBraces:
     - 'app/helpers/application_helper.rb'
     - 'app/helpers/dmails_helper.rb'
     - 'app/helpers/posts_helper.rb'
-    - 'app/logical/elastic_post_query_builder.rb'
     - 'app/logical/moderator/ip_addr_search.rb'
     - 'app/logical/post_thumbnailer.rb'
     - 'app/logical/session_creator.rb'
@@ -1514,12 +1513,6 @@ Style/ComparableClamp:
   Exclude:
     - 'app/models/tag.rb'
 
-# Offense count: 10
-# This cop supports unsafe autocorrection (--autocorrect-all).
-Style/ConcatArrayLiterals:
-  Exclude:
-    - 'app/logical/elastic_post_query_builder.rb'
-
 # Offense count: 1
 # This cop supports unsafe autocorrection (--autocorrect-all).
 # Configuration parameters: EnforcedStyle.
@@ -2445,7 +2438,6 @@ Style/StringLiterals:
     - 'app/helpers/posts_helper.rb'
     - 'app/logical/apng_inspector.rb'
     - 'app/logical/bulk_update_request_importer.rb'
-    - 'app/logical/elastic_post_query_builder.rb'
     - 'app/logical/maintenance.rb'
     - 'app/logical/pbkdf2.rb'
     - 'app/logical/post_thumbnailer.rb'
@@ -2680,7 +2672,6 @@ Style/TrailingCommaInArrayLiteral:
     - 'app/controllers/help_controller.rb'
     - 'app/helpers/moderator/dashboards_helper.rb'
     - 'app/helpers/posts_helper.rb'
-    - 'app/logical/elastic_post_query_builder.rb'
     - 'app/logical/sources/alternates.rb'
     - 'app/logical/sources/strategies.rb'
     - 'app/models/user.rb'
