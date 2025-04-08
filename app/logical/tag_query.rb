@@ -221,6 +221,27 @@ class TagQuery
     q[:groups].present? && (q[:groups][:must].present? || q[:groups][:must_not].present? || q[:groups][:should].present?)
   end
 
+  # Convert the contents of `q[:groups]` to `TagQuery`s if they aren't already.
+  def process_groups(recursive:, **)
+    return if @group_tags_counted || q[:groups].nil?
+    q[:groups].transform_values! do |v|
+      v.map do |e|
+        return e if e.is_a?(TagQuery)
+        increment_tag_count((group = TagQuery.new(
+          e,
+          **,
+          free_tags_count: @tag_count + @free_tags_count,
+          resolve_aliases: @resolve_aliases,
+          hoisted_metatags: nil,
+          process_groups: recursive,
+          depth: @depth + 1,
+        )).tag_count)
+        q[:children_show_deleted] = group.hide_deleted_posts?(at_any_level: true) # recursive)
+        group
+      end
+    end
+  end
+
   # Whether the default behavior to hide deleted posts should be overridden.
   # ### Parameters
   # * `always_show_deleted` [`false`]: The override value. Corresponds to
@@ -1092,8 +1113,13 @@ class TagQuery
     out_of_metatags = false
     params = { preformatted_query: true, ensure_delimiting_whitespace: true, compact: true, force_delim_metatags: true, segregate_metatags: true, delim_metatags: true }.freeze
     if can_have_groups # rubocop:disable Metrics/BlockLength
+      unless (@group_tags_counted = kwargs[:process_groups] || pq_check_group_tags?(depth))
+        @child_args = kwargs
+        @depth = depth
+      end
       TagQuery.scan_search(query, **kwargs, depth: depth, **params)
     else
+      @group_tags_counted = true
       TagQuery.scan_light(query, **params)
     end.each do |token|
       # If we're past the starting run of metatags
