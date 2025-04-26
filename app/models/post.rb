@@ -988,14 +988,19 @@ class Post < ApplicationRecord
     def favorited_users
       favorited_user_ids = fav_string.scan(/\d+/).map(&:to_i)
       visible_users = User.find(favorited_user_ids).reject(&:hide_favorites?)
-      ordered_users = visible_users.index_by(&:id).slice(*favorited_user_ids).values
-      ordered_users
+      visible_users.index_by(&:id).slice(*favorited_user_ids).values
+    end
+
+    def remove_from_select_favorites
+      Favorite.where(post_id: id).where("user.unfavorite_on_deleted = TRUE").delete_all
+      user_ids = fav_string.scan(/\d+/)
+      UserStatus.where(user_id: user_ids).where("user.unfavorite_on_deleted = TRUE").update_all("favorite_count = favorite_count - 1")
     end
 
     def remove_from_favorites
       Favorite.where(post_id: id).delete_all
       user_ids = fav_string.scan(/\d+/)
-      UserStatus.where(:user_id => user_ids).update_all("favorite_count = favorite_count - 1")
+      UserStatus.where(user_id: user_ids).update_all("favorite_count = favorite_count - 1")
     end
   end
 
@@ -1315,16 +1320,16 @@ class Post < ApplicationRecord
       force_flag = options.fetch(:force, false)
       Post.with_timeout(30_000) do
         transaction do
-          flag = flags.create(reason: reason, reason_name: 'deletion', is_resolved: false, is_deletion: true, force_flag: force_flag)
+          flag = flags.create(reason: reason, reason_name: "deletion", is_resolved: false, is_deletion: true, force_flag: force_flag)
 
           if flag.errors.any?
-            raise PostFlag::Error.new(flag.errors.full_messages.join("; "))
+            raise PostFlag::Error, flag.errors.full_messages.join("; ")
           end
 
           update(
             is_deleted: true,
             is_pending: false,
-            is_flagged: false
+            is_flagged: false,
           )
           decrement_tag_post_counts
           move_files_on_delete
@@ -1335,13 +1340,16 @@ class Post < ApplicationRecord
       # XXX This must happen *after* the `is_deleted` flag is set to true (issue #3419).
       # We don't care if these fail per-se so they are outside the transaction.
       UserStatus.for_user(uploader_id).update_all("post_deleted_count = post_deleted_count + 1")
-      give_favorites_to_parent if options[:move_favorites]
-      give_post_sets_to_parent if options[:move_favorites]
+      if options[:move_favorites]
+        give_favorites_to_parent
+        give_post_sets_to_parent
+        remove_from_select_favorites
+      end
       reject_pending_replacements
     end
 
     def reject_pending_replacements
-      replacements.where(status: 'pending').update_all(status: 'rejected')
+      replacements.where(status: "pending").update_all(status: "rejected")
     end
 
     def undelete!(options = {})
@@ -1354,7 +1362,7 @@ class Post < ApplicationRecord
         raise User::PrivilegeError, "You cannot undelete a post you uploaded"
       end
 
-      if !is_deleted
+      unless is_deleted
         errors.add(:base, "Post is not deleted")
         return
       end
@@ -1363,7 +1371,7 @@ class Post < ApplicationRecord
         self.is_deleted = false
         self.is_pending = false
         self.approver_id = CurrentUser.id
-        flags.each { |x| x.resolve! }
+        flags.each(&:resolve!)
         increment_tag_post_counts
         save
         approvals.create(user: CurrentUser.user)

@@ -19,8 +19,8 @@ class User < ApplicationRecord
   end
 
   # Used for `before_action :<role>_only`. Must have a corresponding `is_<role>?` method.
-  Roles = Levels.constants.map(&:downcase) + [
-    :approver,
+  Roles = Levels.constants.map(&:downcase) + %i[
+    approver
   ]
 
   # unintended consequences
@@ -55,10 +55,11 @@ class User < ApplicationRecord
     enable_compact_uploader
     replacements_beta
     is_bd_staff
+    unfavorite_on_deleted
   ].freeze
 
   include Danbooru::HasBitFlags
-  has_bit_flags BOOLEAN_ATTRIBUTES, :field => "bit_prefs"
+  has_bit_flags BOOLEAN_ATTRIBUTES, field: "bit_prefs"
 
   attr_accessor :password, :old_password, :validate_email_format, :is_admin_edit
 
@@ -68,12 +69,12 @@ class User < ApplicationRecord
   validates :email, uniqueness: { case_sensitive: false, if: :enable_email_verification? }
   validates :email, format: { with: /\A.+@[^ ,;@]+\.[^ ,;@]+\z/, if: :enable_email_verification? }
   validates :email, length: { maximum: 100 }
-  validate :validate_email_address_allowed, on: [:create, :update], if: ->(rec) { (rec.new_record? && rec.email.present?) || (rec.email.present? && rec.email_changed?) }
+  validate :validate_email_address_allowed, on: %i[create update], if: ->(rec) { (rec.new_record? && rec.email.present?) || (rec.email.present? && rec.email_changed?) }
 
   normalizes :profile_about, :profile_artinfo, with: ->(value) { value.gsub("\r\n", "\n") }
   validates :name, user_name: true, on: :create
-  validates :default_image_size, inclusion: { :in => %w(large fit fitv original) }
-  validates :per_page, inclusion: { :in => 1..320 }
+  validates :default_image_size, inclusion: { in: %w[large fit fitv original] }
+  validates :per_page, inclusion: { in: 1..320 }
   validates :comment_threshold, presence: true
   validates :comment_threshold, numericality: { only_integer: true, less_than: 50_000, greater_than: -50_000 }
   validates :password, length: { minimum: 8, if: ->(rec) { rec.new_record? || rec.password.present? || rec.old_password.present? } }
