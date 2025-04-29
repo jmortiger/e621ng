@@ -650,17 +650,28 @@ function update_size_selector (choice) {
   return "fit";
 }
 
+/**
+ * Finds the most appropriate video sample based on the difference between the sample's dimensions & the window's dimensions.
+ */
 function most_relevant_sample_size (post) {
+  // First, check if we should even bother.
+  // Don't force people onto 480p samples for <720 videos.
+  if (post?.file?.width <= 1280 && post.file.height <= 720) {
+    return "fit";
+  }
   let samples = Object.entries(Post.currentPost().sample.alternates);
   samples = samples.filter((x) => x[0] !== "original");
   if (samples.length === 0) {
     return "fit";
   }
-  if (post?.file?.width <= 1280 && post?.file?.height <= 720) {
-    return "fit"; // Don't force people onto 480p samples for <720 videos.
-  }
-  const differences = samples.map((x) => [x[0], Math.abs(window.outerHeight - x[1].height) * Math.abs(window.outerWidth - x[1].width)]).sort((a, b) => (a[1] < b[1] ? -1 : 1));
-  return differences[0][0];
+  // const differences = samples.map((x) => [x[0], Math.abs(window.outerHeight - x[1].height) * Math.abs(window.outerWidth - x[1].width)]).sort((a, b) => (a[1] < b[1] ? -1 : 1));
+  // return differences[0][0];
+  // Convert 2nd array element to the difference between the sample's dimensions & the window's dimensions
+  // const lMapper = (x) => [x[0], Math.abs((window.outerHeight - x[1].height) * (window.outerWidth - x[1].width))];
+  const lMapper = (x) => { x[1] = Math.abs((window.outerHeight - x[1].height) * (window.outerWidth - x[1].width)); return x; };
+  // Avoid repeating array iteration w/ map & sort + avoid extra allocation w/ map by converting as you reduce
+  // return samples.reduce((p, e) => (typeof p[1] === "number" ? p : (p = lMapper(p)))[1] < (e = lMapper(e))[1] ? p : e)[0];
+  return samples.reduce((p, e) => (typeof p[1] !== "object" ? p : lMapper(p))[1] < lMapper(e)[1] ? p : e)[0];
 }
 
 Post.initialize_resize = function () {
