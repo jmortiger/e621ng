@@ -6,6 +6,16 @@
 # Used for comment, note, and post approval, disapproval, flag, & upload searches; NOT the main post
 # search, which uses `ElasticPostQueryBuilder`.
 class PostQueryBuilder
+  # Query the given relation, further restricting the output set.
+  # ### Parameters
+  # * `relation` {`ActiveRecord::Relation`}: The relation to modify
+  # * `query` {`String`|`TagQuery`}: The query to add
+  # ### Returns
+  # A relation w/ the given query applied to it.
+  def self.query_relation(relation, query, **)
+    relation.and(PostQueryBuilder.new(query, **).search)
+  end
+
   def initialize(query_string, **kwargs)
     @query = query_string
     @depth = kwargs.fetch(:depth, 0)
