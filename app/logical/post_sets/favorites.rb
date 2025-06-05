@@ -20,6 +20,7 @@ module PostSets
     end
 
     def posts
+      # TODO: use `always_show_deleted` instead of appending `status:any`
       @post_count ||= ::Post.tag_match("fav:#{@user.name} status:any").count_only
       @posts ||= begin
         favs = ::Favorite.for_user(@user.id).includes(:post).order(created_at: :desc).paginate_posts(page, total_count: @post_count, limit: @limit)

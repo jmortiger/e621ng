@@ -93,7 +93,7 @@ class LDistance {
         let insertion_output = d[ i ][ j - 1 ] + LDistance.OPERATION_WEIGHTS[ "insertion" ];
         let substitution_output = d[ i - 1 ][ j - 1 ] + substitution_cost;
         if (substitution_output == deletion_output) {
-          if (insertion_output == deletion_output) { // (substitution == deletion == insertion
+          if (insertion_output == deletion_output) { // substitution == deletion == insertion
             d_substring[ i ][ j ] = `${d_substring[ i - 1 ][ j - 1 ]} ?${d_substring[ 0 ][ j ]}?`;
           } else if (deletion_output < insertion_output) { // (substitution == deletion) < insertion
             d_substring[ i ][ j ] = `${d_substring[ i - 1 ][ j ]} -%${d_substring[ 0 ][ j ]}%-`;

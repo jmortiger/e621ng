@@ -1679,7 +1679,7 @@ class Post < ApplicationRecord
   end
 
   module SearchMethods
-    # returns one single post
+    # returns one single post using the current time to generate an MD5
     def random
       key = Digest::MD5.hexdigest(Time.now.to_f.to_s)
       random_up(key) || random_down(key)
@@ -1693,11 +1693,19 @@ class Post < ApplicationRecord
       where("md5 >= ?", key).reorder("md5 asc").first
     end
 
+    # Samples a random collection of posts matching the query.
+    # ### Parameters
+    # * `query` {`String`}: the query to sample
+    # * `sample_size`: the number of samples to gather
+    # ### Returns
+    # An `ActiveRecord::Relation` sampling `sample_size` posts matching `query`.
     def sample(query, sample_size)
       tag_match_system("#{query} order:random", free_tags_count: 1).limit(sample_size).relation
     end
 
-    # unflattens the tag_string into one tag per row.
+    # Unflattens the tag_string into one tag per row.
+    # ### Returns
+    # An `ActiveRecord::Relation` with an unflattened `tag_string`.
     def with_unflattened_tags
       joins("CROSS JOIN unnest(string_to_array(tag_string, ' ')) AS tag")
     end
@@ -1734,6 +1742,9 @@ class Post < ApplicationRecord
       where("string_to_array(posts.tag_string, ' ') @> ARRAY[?]", tag)
     end
 
+    # Same as `tag_match` w/ `enable_safe_mode` set to `false` & `always_show_deleted` set to `true`.
+    # ### Parameters
+    # ### Returns
     def tag_match_system(query, free_tags_count: 0)
       tag_match(query, free_tags_count: free_tags_count, enable_safe_mode: false, always_show_deleted: true)
     end
