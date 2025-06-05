@@ -92,8 +92,8 @@ class RelatedPostsTest < ActiveSupport::TestCase
 
       should "work by sampling" do
         expected = [@p0, @p1, @p2, @p3]
-        results = RelatedPosts.get_from_post_and_sample(@p0, sample_size: 7, max_results: 4)
-        assert(results.all? { |e| expected.include?(e) }, "Expected #{expected.map(&:id)}, got #{results.map(&:id)}; #{RelatedPosts.calculate_from_post_and_sample(@p0, sample_size: 7, max_results: 4)}")
+        results = RelatedPosts.get_from_post_and_sample(@p0, sample_size: 9 * 2, max_results: 4)
+        assert(results.all? { |e| expected.include?(e) }, "Expected #{expected.map(&:id)}, got #{results.map(&:id)}; #{RelatedPosts.calculate_from_post_and_sample(@p0, sample_size: 9 * 2, max_results: 4)}")
         assert_equal(expected.first, results.first)
       end
     end
