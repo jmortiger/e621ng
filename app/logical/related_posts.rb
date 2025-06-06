@@ -274,6 +274,7 @@ class RelatedPosts
     # puts "Result: #{sprintf("%0 4.2f", d[num_rows][num_cols])} / #{sprintf("%0 4.2f", max_weight)} = #{d[num_rows][num_cols] / max_weight}"
     d[num_rows][num_cols] / max_weight
   end
+
   # Damerau–Levenshtein distance
   # ### Parameters
   # * `source_arr`: a collection
@@ -436,6 +437,8 @@ class RelatedPosts
   def self.max_results
     CurrentUser.user&.per_page || Danbooru.config.records_per_page
   end
+
+  # TODO: Make stubs private
 
   # #region Stubs
 

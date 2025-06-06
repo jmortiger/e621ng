@@ -101,6 +101,7 @@ module ParseValue
 
   private
 
+  # IDEA: Auto-flip bad date ranges?
   def cast(object, type)
     case type
     when :integer

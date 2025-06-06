@@ -301,7 +301,7 @@ class TagQuery
   #   * Resolves tag aliases
   # * Sorts
   # * Removes duplicates
-  # * Joins into a unified string
+  # * Joins into a unified string, delimiting entries with a single space
   def self.normalize(query)
     tags = TagQuery.scan(query)
     tags = tags.map { |t| Tag.normalize_name(t) }
@@ -321,7 +321,7 @@ class TagQuery
   #   * Resolves tag aliases (if `normalize_tags`)
   # * Sorts
   # * Removes duplicates at that group's top level
-  # Then, if `flatten`, Joins into a unified string
+  # Then, if `flatten`, Joins into a unified string, delimiting entries with a single space
   def self.normalize_search(query, normalize_tags: true, flatten: true)
     tags = TagQuery.scan_recursive(
       query,
@@ -491,13 +491,13 @@ class TagQuery
   # ### Raises
   # * `TagQuery::DepthExceededError`
   #
-  # TODO: * `max_tokens_to_process` [`Danbooru.config.tag_query_limit * 2`]
+  # IDEA: * `max_tokens_to_process` [`Danbooru.config.tag_query_limit * 2`]
   #
-  # TODO: * `separate_groups` [`nil`]: place groups at the end of the return value to optimize `parse_query`?
+  # IDEA: * `separate_groups` [`nil`]: place groups at the end of the return value to optimize `parse_query`?
   #
-  # TODO: * `error_on_count_exceeded` [`false`]
+  # IDEA: * `error_on_count_exceeded` [`false`]
   #
-  # TODO: * `free_tags_count` [`false`]
+  # IDEA: * `free_tags_count` [`false`]
   def self.scan_search(
     query,
     hoisted_metatags: TagQuery::GLOBAL_METATAGS,
@@ -573,7 +573,7 @@ class TagQuery
     # If segregating metatags & there either are metatags or we're adding the delimiter regardless...
     if kwargs[:segregate_metatags] && (matches.present? || kwargs[:force_delim_metatags])
       (kwargs.fetch(:delim_metatags, true) ? mts << END_OF_METATAGS_TOKEN : mts).concat(matches)
-    else # Remember, if `!kwargs[:segregate_metatags]`, this is the same as `matches`, and if not, there is different, but `matches` is empty and we aren't adding the delimiter unless there are non-metatags.
+    else # Remember, if `!kwargs[:segregate_metatags]`, this is the same as `matches`, and if not, they are different, but `matches` is empty and we aren't adding the delimiter unless there are non-metatags.
       mts
     end
   end
@@ -582,11 +582,12 @@ class TagQuery
   REGEX_SIMPLE_SCAN_NON_DELIM = /\G(?>\s*)([-~]?)((?>\w+:(?>"[^"]+"|\S+))|\S+)(?>\s*)/
 
   # Doesn't account for grouping, but DOES preserve quoted metatag ordering.
-  #
+  # ### Parameters
   # * `query`
   # * `ensure_delimiting_whitespace` [`true`]: Force quoted metatags to be followed by whitespace,
   # or mimic legacy behavior?
   # * `preformatted_query` [`nil`]
+  # ### Returns
   #
   # OPTIMIZE: Profile variants (including scan_legacy)
   def self.scan(query, **kwargs)
@@ -600,8 +601,10 @@ class TagQuery
   REGEX_SCAN_LIGHT_DELIM = /(?<=\s|\A)[-~]?\w+:(?>"[^"]+"(?=\s|\z)|\S+)/
   REGEX_SCAN_LIGHT_NON_DELIM = /[-~]?\w+:(?>"[^"]+"|\S+)/
 
-  # A token that is impossible to input normally that signals to `TagQuery#parse_query` that the
+  # A token\* that is impossible to input normally that signals to `TagQuery#parse_query` that the
   # leading run of metatags is over to allow it to skip extra processing.
+  #
+  # \* In this context, a token refers to a tag/metatag, optionally w/ a prefix.
   #
   # NOTE: This is impossible for users to replicate b/c a token starting w/ " won't preserve whitespace
   END_OF_METATAGS_TOKEN = '"END OF METATAGS"'
@@ -649,6 +652,9 @@ class TagQuery
     quote_delimited + tagstr.split.uniq
   end
 
+  # `scan_recursive` helper function
+  # TODO: Summary
+  # ### Parameters
   # * `matches` {`Array`}
   # * `prefix` {`String`}
   # * `strip_prefixes` {`boolean`}:
@@ -668,6 +674,14 @@ class TagQuery
     else
       kwargs.fetch(:flatten) ? matches : [matches]
     end
+  end
+
+  # `scan_recursive` helper function
+  # TODO: Summary
+  # ### Parameters
+  # ### Returns
+  private_class_method def self.normalize_single_tag(tag)
+    TagAlias.active.where(antecedent_name: (tag = Tag.normalize_name(tag)))&.first&.consequent_name || tag
   end
 
   # Scans the given string and processes any groups within recursively.
@@ -1029,10 +1043,6 @@ class TagQuery
   # The relevant tags in a ` `-separated string.
   def self.ad_tag_string(tag_array)
     TagQuery.fetch_tags(tag_array, *Danbooru.config.ads_keyword_tags).join(" ")
-  end
-
-  private_class_method def self.normalize_single_tag(tag)
-    TagAlias.active.where(antecedent_name: (tag = Tag.normalize_name(tag)))&.first&.consequent_name || tag
   end
 
   private
