@@ -439,38 +439,16 @@ class RelatedPosts
 
   # #region Stubs
 
-  # TODO: Get rid of
-  def self.invert_normalized_distance(dist)
-    # -1 * dist + 1
-    dist
-  end
-
+  # TODO: Use `max_results`?
   def self.calculate_stub(posts_array, tag_array, _max_results)
-    posts_array.index_with { |e| invert_normalized_distance(RelatedPosts.l_distance(tag_array, e.tag_string.split)) }
-    # puts "#{tag_array}:"
-    # posts_array.index_with do |e|
-    #   v = invert_normalized_distance(RelatedPosts.l_distance(tag_array, e.tag_string.split))
-    #   puts "w/ #{e.tag_string} (#{e.id}): #{v}"
-    #   v
-    # end
+    posts_array.index_with { |e| RelatedPosts.l_distance(tag_array, e.tag_string.split) }
   end
 
   def self.get_stub(posts_array, tag_array, max_results)
-    posts_array.sort_by { |e| invert_normalized_distance(RelatedPosts.l_distance(tag_array, e.tag_string.split)) }.first(max_results)
-
-    # puts "#{tag_array}:"
-    # results = []
-    # ret = posts_array.sort_by do |e|
-    #   v = invert_normalized_distance(RelatedPosts.l_distance(tag_array, e.tag_string.split))
-    #   puts "w/ #{e.tag_string} (#{e.id}): #{v}"
-    #   results << "#{v} for #{e.id}"
-    #   v
-    # end.first(max_results)
-    # puts "#{results.sort}"
-    # ret
+    posts_array.sort_by { |e| RelatedPosts.l_distance(tag_array, e.tag_string.split) }.first(max_results)
   end
 
-  # TODO: Stop relying on auto-conversion & handle properly
+  # IDEA: Stop relying on auto-conversion to array & properly handle relation
   def self.from_tags_and_relation(tag_array, relation, query = "", max_results: RelatedPosts.max_results, &)
     relation = PostQueryBuilder.query_relation(query, relation) if query.present?
     return if relation.empty?
@@ -479,7 +457,8 @@ class RelatedPosts
     end
   end
 
-  def self.from_tags_and_array(tag_array, posts, query = "", max_results: RelatedPosts.max_results, &)
+  # TODO: Use `_query`?
+  def self.from_tags_and_array(tag_array, posts, _query = "", max_results: RelatedPosts.max_results, &)
     return if posts.empty?
     if posts.first.is_a?(Post)
       yield(posts, tag_array, max_results)
@@ -494,9 +473,9 @@ class RelatedPosts
     end
   end
 
-  # TODO: Stop relying on auto-conversion & handle properly
+  # IDEA: Stop relying on auto-conversion to array & properly handle relation
   def self.from_post_and_relation(post, relation, query = "", max_results: RelatedPosts.max_results, &)
-    # relation = relation.excluding(post) # Remove given post from results
+    relation = relation.excluding(post) # Remove given post from results
     relation = PostQueryBuilder.query_relation(query, relation) if query.present?
     return if relation.empty?
     if relation.first.is_a?(Post)
@@ -504,8 +483,10 @@ class RelatedPosts
     end
   end
 
-  def self.from_post_and_array(post, posts, query = "", max_results: RelatedPosts.max_results, &)
-    # posts.delete(post) # Remove given post from results
+  # TODO: Use `_query`?
+  # NOTE: Has a safety to prevent post deletion if incorrectly given a Relation or something.
+  def self.from_post_and_array(post, posts, _query = "", max_results: RelatedPosts.max_results, &)
+    posts.delete(post) unless posts.respond_to?(:destroy) # Remove given post from results
     return if posts.empty?
     if posts.first.is_a?(Post)
       yield(posts, post.tag_string.split.freeze, max_results)
@@ -521,6 +502,7 @@ class RelatedPosts
   end
   # #endregion Stubs
 
+  # #region "Public" Methods
   def self.get_from_tags_and_collection(tag_array, posts, query = "", max_results: RelatedPosts.max_results)
     RelatedPosts.from_tags_and_collection(tag_array, posts, query, max_results, &method(:get_stub))
   end
@@ -552,4 +534,5 @@ class RelatedPosts
   def self.calculate_from_post_and_sample(post, query = "", sample_size: Danbooru.config.post_sample_size, max_results: RelatedPosts.max_results)
     RelatedPosts.from_post_and_relation(post, Post.sample(query, sample_size), max_results: max_results, &method(:calculate_stub))
   end
+  # #endregion "Public" Methods
 end

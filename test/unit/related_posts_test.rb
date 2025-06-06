@@ -43,23 +43,23 @@ class RelatedPostsTest < ActiveSupport::TestCase
   # _eventually
   should "correctly determine the relative differences of tag arrays" do
     s = %w[a specific list of tags to search for].freeze
-    d1_1 = %w[specific list of tags to search for].freeze
-    d1_2 = %w[a specific listing of tags to search for].freeze
-    d1_3 = %w[a specific list of tags to search for now].freeze
+    dw1_n1 = %w[specific list of tags to search for].freeze
+    dw1_n2 = %w[a specific listing of tags to search for].freeze
+    dw1_n3 = %w[a specific list of tags to search for now].freeze
     d2 = %w[specific listing of tags to search for].freeze
     d3 = %w[specific listing of tags to search for now].freeze
     d_f = %w[and now for something completely different].freeze
     # puts "#{s}"
-    # puts "#{d1_1}"
-    # puts "#{d1_2}"
-    # puts "#{d1_3}"
+    # puts "#{dw1_n1}"
+    # puts "#{dw1_n2}"
+    # puts "#{dw1_n3}"
     # puts "#{d2}"
     # puts "#{d3}"
     # puts "#{d_f}"
     assert_equal(0, RelatedPosts.l_distance(s, s, normalize: false))
-    assert_equal(WEIGHTS[:deletion], RelatedPosts.l_distance(s, d1_1, normalize: false))
-    assert_equal(WEIGHTS[:substitution], RelatedPosts.l_distance(s, d1_2, normalize: false))
-    assert_equal(WEIGHTS[:insertion], RelatedPosts.l_distance(s, d1_3, normalize: false))
+    assert_equal(WEIGHTS[:deletion], RelatedPosts.l_distance(s, dw1_n1, normalize: false))
+    assert_equal(WEIGHTS[:substitution], RelatedPosts.l_distance(s, dw1_n2, normalize: false))
+    assert_equal(WEIGHTS[:insertion], RelatedPosts.l_distance(s, dw1_n3, normalize: false))
     assert_equal(2, RelatedPosts.l_distance(s, d2, normalize: false))
     assert_equal(3, RelatedPosts.l_distance(s, d3, normalize: false))
     assert_equal(0, RelatedPosts.l_distance(s, s, normalize: true))
@@ -76,8 +76,9 @@ class RelatedPostsTest < ActiveSupport::TestCase
     assert_equal(1, RelatedPosts.l_distance(CASES_STR[:original][:case], CASES_STR[:different][:case], normalize: true))
   end
 
-  context "Post Similarity" do
-    context "Search" do
+  # TODO: Use `CASES_TAGS`
+  context "Post Similarity:" do
+    context "Search:" do
       setup do
         @p0 = create(:post, tag_string: "aaa bbb ccc ddd fff")
         @p1 = create(:post, tag_string: "bbb ccc ddd fff")
@@ -88,13 +89,28 @@ class RelatedPostsTest < ActiveSupport::TestCase
         @p6 = create(:post, tag_string: "aaa b_b ccc ddd eee fff")
         @p7 = create(:post, tag_string: "b_b ccc ddd eee fff")
         @p8 = create(:post, tag_string: "ttt uuu vvv www xxx yyy zzz")
+        @all_posts = [@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8].freeze
+      end
+      teardown do
+        @all_posts.map(&:id).each { |e| Post.destroy(e) }
       end
 
       should "work by sampling" do
-        expected = [@p0, @p1, @p2, @p3]
-        results = RelatedPosts.get_from_post_and_sample(@p0, sample_size: 9 * 2, max_results: 4)
-        assert(results.all? { |e| expected.include?(e) }, "Expected #{expected.map(&:id)}, got #{results.map(&:id)}; #{RelatedPosts.calculate_from_post_and_sample(@p0, sample_size: 9 * 2, max_results: 4)}")
+        expected = [@p2, @p1, @p3] # When dest is longer than source, it increases the number of potential operations, so insertion is first.
+        results = RelatedPosts.get_from_post_and_sample(@p0, sample_size: @all_posts.length, max_results: 3)
+        assert(results.all? { |e| expected.include?(e) }, "Expected #{expected.map(&:id)}, got #{results.map(&:id)}; #{RelatedPosts.calculate_from_post_and_sample(@p0, sample_size: @all_posts.length, max_results: 3).transform_keys(&:id)}")
         assert_equal(expected.first, results.first)
+      end
+
+      should "exclude the reference post" do
+        results = RelatedPosts.get_from_post_and_sample(@p0, sample_size: @all_posts.length)
+        assert(results.none? { |e| e == @p0 }, "Results shouldn't include the reference post (#{@p0.id}); #{results.map(&:id)}")
+      end
+
+      should "have the least relevant posts last" do
+        results = RelatedPosts.get_from_post_and_sample(@p0, sample_size: @all_posts.length)
+        assert_equal(@p7.id, results[-2].id)
+        assert_equal(@p8.id, results[-1].id)
       end
     end
   end
