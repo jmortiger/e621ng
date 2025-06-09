@@ -1,0 +1,33 @@
+<div id="c-related-posts">
+  <div id="a-show">
+    <h1>Related Posts</h1>
+    <section>
+      <%= form_search(path: related_post_path, always_display: true) do |f| %>
+        <%= f.input :query, autocomplete: "tag-query" %>
+        <%= f.input :id, value: @id %>
+        <%# <%= f.input :category_id, collection: TagCategory::CANONICAL_MAPPING.to_a, include_blank: true %>
+      <% end %>
+    </section>
+    <% if @related_posts.post %>
+      <% @related_posts.post_for_html %>
+    <% end %>
+    <%# <% if @related_posts.query.present? %>
+      <section class="related-posts-container">
+        <% if @related_posts.posts.empty? %>
+          <%= render "posts/blank" %>
+        <% else %>
+          <%# <% @related_posts.posts_for_html %>
+          <% @related_posts.posts_for_html.each do |post| %>
+            <%= post.preview_html(self, {num: @related_posts.posts_map_id[post.id], tags: "", show_cropped: true, stats: CurrentUser.show_post_statistics?}) %>
+          <% end %>
+        <% end %>
+      </section>
+    <%# <% end %>
+  </div>
+</div>
+
+<%= render "posts/partials/common/secondary_links" %>
+
+<% content_for(:page_title) do %>
+  Related Posts
+<% end %>

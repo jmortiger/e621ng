@@ -538,4 +538,38 @@ class RelatedPosts
     RelatedPosts.from_post_and_relation(post, Post.sample(query, sample_size), max_results: max_results, &method(:calculate_stub))
   end
   # #endregion "Public" Methods
+
+  def self.invert_hash(hash, ordered: false)
+    pmi = {}
+    hash.each_pair do |p, d|
+      if pmi.key?(d)
+        if pmi[d].is_a?(Array)
+          pmi[d] << p
+        else
+          pmi[d] = [pmi[d], p]
+        end
+      else
+        pmi[d] = p
+      end
+    end
+    return pmi unless ordered
+    ret = {}
+    pmi.keys.sort.each do |d|
+      ret[d] = pmi[d]
+    end
+    ret
+  end
+
+  def self.hash_to_sorted_array(hash)
+    posts = []
+    pmi = RelatedPosts.invert_hash(hash)
+    pmi.keys.sort.each do |d|
+      if pmi[d].is_a?(Array)
+        posts.push(*pmi[d])
+      else
+        posts.push(pmi[d])
+      end
+    end
+    posts
+  end
 end

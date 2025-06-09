@@ -276,7 +276,9 @@ Rails.application.routes.draw do
       put :unhide
     end
   end
+  resource :related_post, :only => [:show, :update]
   resource :related_tag, :only => [:show, :update]
+  # NOTE: Is this accessible?
   match "related_tag/bulk", to: "related_tags#bulk", via: [:get, :post]
   resource :session, only: %i[new create destroy] do
     get :confirm_password, on: :collection

@@ -42,7 +42,7 @@ class PostsDecorator < ApplicationDecorator
     score > 0 ? "score-positive" : "score-negative"
   end
 
-  def stats_section(template)
+  def stats_section(template, **options)
     post = object
     status_flags = []
     status_flags << "P" if post.parent_id
@@ -56,7 +56,8 @@ class PostsDecorator < ApplicationDecorator
     comments = template.tag.span "C#{post.visible_comment_count(CurrentUser)}", class: "comments"
     rating = template.tag.span(post.rating.upcase, class: "rating")
     # status = template.tag.span(status_flags.join, class: "extras")
-    template.tag.div score + favs + comments + rating, class: "desc"
+    ranking = template.tag.span(sprintf("%s%2.2f", options[:num].is_a?(Integer) ? "#" : "", options[:num] || 0), class: "rating")
+    template.tag.div ranking + score + favs + comments + rating, class: "desc"
   end
 
   def preview_html(template, options = {})
@@ -123,7 +124,7 @@ class PostsDecorator < ApplicationDecorator
         template.concat template.tag.img class: "has-cropped-#{has_cropped}", src: preview_url, title: tooltip, alt: alt_text
       end
     end
-    desc_contents = options[:stats] ? stats_section(template) : "".html_safe
+    desc_contents = options[:stats] ? stats_section(template, **options) : "".html_safe
     template.tag.article(**article_attrs) do
       img_contents + desc_contents
     end

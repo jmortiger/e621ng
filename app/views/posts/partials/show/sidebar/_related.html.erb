@@ -13,4 +13,5 @@
   <% end %>
   <li class="list-break"></li>
   <li><a rel="nofollow noreferrer" target="_blank" href="https://inkbunny.net/search_process.php?text=<%= @post.md5 %>&md5=yes">Inkbunny</a></li>
+    <li><%= link_to "Tagged similarly on E6", related_post_path(search: { id: @post.id }), rel: "nofollow noreferrer" %></li>
 </ul>

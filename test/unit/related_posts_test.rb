@@ -40,7 +40,6 @@ class RelatedPostsTest < ActiveSupport::TestCase
     t
   end
 
-  # _eventually
   should "correctly determine the relative differences of tag arrays" do
     s = %w[a specific list of tags to search for].freeze
     dw1_n1 = %w[specific list of tags to search for].freeze
@@ -49,13 +48,6 @@ class RelatedPostsTest < ActiveSupport::TestCase
     d2 = %w[specific listing of tags to search for].freeze
     d3 = %w[specific listing of tags to search for now].freeze
     d_f = %w[and now for something completely different].freeze
-    # puts "#{s}"
-    # puts "#{dw1_n1}"
-    # puts "#{dw1_n2}"
-    # puts "#{dw1_n3}"
-    # puts "#{d2}"
-    # puts "#{d3}"
-    # puts "#{d_f}"
     assert_equal(0, RelatedPosts.l_distance(s, s, normalize: false))
     assert_equal(WEIGHTS[:deletion], RelatedPosts.l_distance(s, dw1_n1, normalize: false))
     assert_equal(WEIGHTS[:substitution], RelatedPosts.l_distance(s, dw1_n2, normalize: false))
@@ -78,23 +70,24 @@ class RelatedPostsTest < ActiveSupport::TestCase
 
   # TODO: Use `CASES_TAGS`
   context "Post Similarity:" do
-    context "Search:" do
-      setup do
-        @p0 = create(:post, tag_string: "aaa bbb ccc ddd fff")
-        @p1 = create(:post, tag_string: "bbb ccc ddd fff")
-        @p2 = create(:post, tag_string: "aaa bbb ccc ddd eee fff")
-        @p3 = create(:post, tag_string: "aaa b_b ccc ddd fff")
-        @p4 = create(:post, tag_string: "bbb ccc ddd eee fff")
-        @p5 = create(:post, tag_string: "b_b ccc ddd fff")
-        @p6 = create(:post, tag_string: "aaa b_b ccc ddd eee fff")
-        @p7 = create(:post, tag_string: "b_b ccc ddd eee fff")
-        @p8 = create(:post, tag_string: "ttt uuu vvv www xxx yyy zzz")
-        @all_posts = [@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8].freeze
-      end
-      teardown do
-        @all_posts.map(&:id).each { |e| Post.destroy(e) }
-      end
+    setup do
+      @p0 = create(:post, tag_string: "aaa bbb ccc ddd fff")
+      @p1 = create(:post, tag_string: "bbb ccc ddd fff")
+      @p2 = create(:post, tag_string: "aaa bbb ccc ddd eee fff")
+      @p3 = create(:post, tag_string: "aaa b_b ccc ddd fff")
+      @p4 = create(:post, tag_string: "bbb ccc ddd eee fff")
+      @p5 = create(:post, tag_string: "b_b ccc ddd fff")
+      @p6 = create(:post, tag_string: "aaa b_b ccc ddd eee fff")
+      @p7 = create(:post, tag_string: "b_b ccc ddd eee fff")
+      @p8 = create(:post, tag_string: "ttt uuu vvv www xxx yyy zzz")
+      @all_posts = [@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8].freeze
+    end
 
+    teardown do
+      @all_posts.map(&:id).each { |e| Post.destroy(e) }
+    end
+
+    context "Search:" do
       should "work by sampling" do
         expected = [@p2, @p1, @p3] # When dest is longer than source, it increases the number of potential operations, so insertion is first.
         results = RelatedPosts.get_from_post_and_sample(@p0, sample_size: @all_posts.length, max_results: 3)
@@ -111,6 +104,37 @@ class RelatedPostsTest < ActiveSupport::TestCase
         results = RelatedPosts.get_from_post_and_sample(@p0, sample_size: @all_posts.length)
         assert_equal(@p7.id, results[-2].id)
         assert_equal(@p8.id, results[-1].id)
+      end
+    end
+
+    context "Helpers" do
+      should "correctly convert a hash of posts mapped to their distances to an array of posts ordered by distance" do
+        hash = RelatedPosts.calculate_from_post_and_sample(@p0, sample_size: @all_posts.length)
+        posts = hash.keys
+        out = RelatedPosts.hash_to_sorted_array(hash)
+        assert_equal(hash.count, out.length)
+        assert_equal(posts.length, out.length)
+        prior = -9_999_999
+        assert((0...posts.length).all? do |e|
+          t = hash[out[e]] >= prior
+          prior = hash[out[e]]
+          t
+        end)
+      end
+
+      should "correctly convert a hash of posts mapped to their distances to a hash of distances mapped to the posts with that distance" do
+        hash = RelatedPosts.calculate_from_post_and_sample(@p0, sample_size: @all_posts.length)
+        out = RelatedPosts.invert_hash(hash)
+        cb = nil
+        cb = proc do |k, v|
+          if v.is_a?(Array)
+            v.each { |e| cb.call(k, e) }
+          else
+            assert_equal(hash[v], k)
+            assert_equal(RelatedPosts.l_distance(@p0.tag_string.split, v.tag_string.split), k)
+          end
+        end
+        out.each(&cb)
       end
     end
   end
