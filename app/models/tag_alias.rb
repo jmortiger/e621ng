@@ -102,7 +102,7 @@ class TagAlias < TagRelationship
 
     lines.each do |line|
       content = { tags: [] }
-      if line.strip.empty?
+      if line.strip.empty? # TODO: Use `.blank?`?
         processed << content
         next
       end
