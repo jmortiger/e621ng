@@ -191,6 +191,8 @@ class TagQueryTest < ActiveSupport::TestCase
         assert_equal(["order:random", "limit:50", "randseed:123", "( aaa )", "-( bbb )"], TagQuery.scan_search("( order:random aaa limit:50 ) -( bbb randseed:123 )", segregate_metatags: true, delim_metatags: false))
         assert_equal(["order:random", "limit:50", "randseed:123", TagQuery::END_OF_METATAGS_TOKEN, "( aaa )", "-( bbb )"], TagQuery.scan_search("( order:random aaa limit:50 ) -( bbb randseed:123 )", segregate_metatags: true))
         assert_equal("random", TagQuery.new("( order:random aaa limit:50 ) -( bbb randseed:123 )")[:order])
+        # Ensure tag hoisting works on negated order tags
+        assert_equal("random", TagQuery.new("( -order:random aaa limit:50 ) -( bbb randseed:123 )")[:order])
         assert_equal(123, TagQuery.new("( order:random aaa limit:50 ) -( bbb randseed:123 )")[:random_seed])
       end
     end
@@ -596,6 +598,46 @@ class TagQueryTest < ActiveSupport::TestCase
     end
   end
 
+  should "have correctly constructed order constants" do
+    # # Uncomment to print out all valid inputs & their outputs.
+    # # Ruby Hash
+    # puts "{"
+    # TagQuery::ORDER_METATAGS.each do |x|
+    #   puts "\torder:#{x} -> \"#{TagQuery.normalize_order_value(x, invert: false)}\","
+    #   puts "\t-order:#{x} -> \"#{TagQuery.normalize_order_value(x, invert: true)}\","
+    # end
+    # puts "}"
+    # # Markdown
+    # mapping = {}
+    # TagQuery::ORDER_METATAGS.each do |x|
+    #   normalized = TagQuery.normalize_order_value(x, invert: false)
+    #   mapping[normalized] ||= []
+    #   mapping[normalized] << -"`order:#{x}`"
+    #   normalized = TagQuery.normalize_order_value(x, invert: true)
+    #   mapping[normalized] ||= []
+    #   mapping[normalized] << -"`-order:#{x}`"
+    # end
+    # mapping.each_pair do |normal, resolvers|
+    #   puts " * #{resolvers.join(', ')} -> `#{normal}`"
+    # end
+    assert_equal(TagQuery::ORDER_METATAGS.uniq, TagQuery::ORDER_METATAGS, "Contains duplicates (#{TagQuery::ORDER_METATAGS - TagQuery::ORDER_METATAGS.uniq})")
+    assert_equal([], TagQuery::ORDER_INVERTIBLE_ALIASES.values - TagQuery::ORDER_INVERTIBLE_ROOTS, "Not all resolved alias values are in roots.")
+    assert(TagQuery::ORDER_NON_SUFFIXED_ALIASES.values.uniq.all? { |x| TagQuery.order_valid_non_suffixed_alias_values.include?(x) }, "Invalid non-suffixed aliases values: #{TagQuery::ORDER_NON_SUFFIXED_ALIASES.each_pair.map { |x, y| "#{x}: #{y}" unless TagQuery.order_valid_non_suffixed_alias_values.include?(x) }.join(', ')}")
+    # All potential values should be accessible via the filtered autocomplete entries
+    cb = ->(arr) do
+      arr.flat_map do |e|
+        [
+          TagQuery.normalize_order_value(e, invert: false, processed: true),
+          TagQuery.normalize_order_value(e, invert: true, processed: true),
+        ]
+      end.uniq
+    end
+    full_values = cb.call(TagQuery::ORDER_METATAGS)
+    filtered_values = cb.call(TagQuery::ORDER_METATAGS_AUTOCOMPLETE)
+    values_difference = (full_values - filtered_values)
+    assert(values_difference.empty?, "Not all values are accessible (#{TagQuery::ORDER_METATAGS - TagQuery::ORDER_METATAGS.uniq})")
+  end
+
   MAPPING = {
     user: :uploader_ids,
     user_id: :uploader_ids,
@@ -660,7 +702,7 @@ class TagQueryTest < ActiveSupport::TestCase
 
   # TODO: Add more test cases for group parsing
   # TODO: Add more test cases for metatag parsing
-  context "Parsing a query:" do
+  context "Parsing:" do
     should "correctly handle up to 40 standard tags" do
       expected_result = {
         tags: {
@@ -763,7 +805,19 @@ class TagQueryTest < ActiveSupport::TestCase
       assert_equal(%w[acb azb], TagQuery.new("( a*b )")[:tags][:should])
     end
 
-    context "W/ metatags:" do
+    context "Metatags:" do
+      context "Hoisting" do
+        should "fail for more than #{TagQuery::DEPTH_LIMIT} levels of group nesting" do
+          assert_raise(TagQuery::DepthExceededError) do
+            TagQuery.new("aaa #{(0..(TagQuery::DEPTH_LIMIT - 1)).inject('limit:10') { |prior, _| "( #{prior} )" }}", error_on_depth_exceeded: true)
+          end
+        end
+
+        should "not fail for less than or equal to #{TagQuery::DEPTH_LIMIT} levels of group nesting" do
+          TagQuery.new("aaa #{(0...(TagQuery::DEPTH_LIMIT - 1)).inject('limit:10') { |prior, _| "( #{prior} )" }}", error_on_depth_exceeded: true)
+        end
+      end
+
       should "match w/ case insensitivity" do
         %w[id:2 Id:2 ID:2 iD:2].map { |e| TagQuery.new(e)[:post_id] }.all?(2)
       end
@@ -910,6 +964,8 @@ class TagQueryTest < ActiveSupport::TestCase
             assert_equal("any", result[:status])
             assert_nil(result[:status_must_not])
             assert_not(result.hide_deleted_posts?)
+
+            # In prior versions, deleted filtering was based of the final value of `status`/`status_must_not`, so the metatag ordering changed the results. This ensures this legacy behavior stays gone.
             ["status:active #{y}", "#{y} status:active"].each do |z|
               result = TagQuery.new(z)
               assert_equal(true, result[:show_deleted])
@@ -925,6 +981,69 @@ class TagQueryTest < ActiveSupport::TestCase
               assert_not(result.hide_deleted_posts?)
             end
           end
+        end
+      end
+
+      # * Multiple status values should only preserve the final one
+      # * Should not have a `q[:status]` & `q[:status_must_not]` simultaneously
+      # * Even if it is later overwritten, any value that would disable deleted filtering should permanently do so
+      # * Currently allows invalid values to overwrite valid values
+      # * If `ElasticPostQueryBuilder::GLOBAL_DELETED_FILTER`, all
+      should "correctly handle status" do
+        TagQuery::STATUS_VALUES.each do |x| # rubocop:disable Metrics/BlockLength
+          expect_to_hide = TagQuery::OVERRIDE_DELETED_FILTER_STATUS_VALUES.exclude?(x)
+          result = TagQuery.new(-"status:#{x}")
+          assert_equal(x, result[:status], x)
+          assert_nil(result[:status_must_not], x)
+          assert_equal(expect_to_hide, result.hide_deleted_posts?, x)
+          result = TagQuery.new(-"-status:#{x}")
+          assert_equal(x, result[:status_must_not], x)
+          assert_nil(result[:status], x)
+          assert_equal(expect_to_hide, result.hide_deleted_posts?, x)
+
+          result = TagQuery.new(-"status:active status:#{x}")
+          assert_equal(true, result[:show_deleted], x)
+          assert_equal(x, result[:status], x)
+          assert_nil(result[:status_must_not], x)
+          assert_not(result.hide_deleted_posts?, x)
+
+          result = TagQuery.new(-"status:#{x} status:active")
+          assert_equal(true, result[:show_deleted], x)
+          assert_equal("active", result[:status], x)
+          assert_nil(result[:status_must_not], x)
+          assert_not(result.hide_deleted_posts?, x)
+
+          result = TagQuery.new(-"-status:active -status:#{x}")
+          assert_equal(true, result[:show_deleted], x)
+          assert_equal(x, result[:status_must_not], x)
+          assert_nil(result[:status], x)
+          assert_not(result.hide_deleted_posts?, x)
+
+          result = TagQuery.new(-"-status:#{x} -status:active")
+          assert_equal(true, result[:show_deleted], x)
+          assert_equal("active", result[:status_must_not], x)
+          assert_nil(result[:status], x)
+          assert_not(result.hide_deleted_posts?, x)
+
+          result = TagQuery.new("status:#{x} -status:modqueue")
+          assert_equal("modqueue", result[:status_must_not], x)
+          assert_nil(result[:status], x)
+          assert_equal(expect_to_hide, result.hide_deleted_posts?, x)
+
+          result = TagQuery.new(-"-status:modqueue status:#{x}")
+          assert_equal(x, result[:status], x)
+          assert_nil(result[:status_must_not], x)
+          assert_equal(expect_to_hide, result.hide_deleted_posts?, x)
+
+          result = TagQuery.new(-"-status:modqueue -status:#{x}")
+          assert_equal(x, result[:status_must_not], x)
+          assert_nil(result[:status], x)
+          assert_equal(expect_to_hide, result.hide_deleted_posts?, x)
+
+          result = TagQuery.new("-status:#{x} -status:modqueue")
+          assert_equal("modqueue", result[:status_must_not], x)
+          assert_nil(result[:status], x)
+          assert_equal(expect_to_hide, result.hide_deleted_posts?, x)
         end
       end
 
@@ -1095,7 +1214,6 @@ class TagQueryTest < ActiveSupport::TestCase
       # when "parent", "-parent", "~parent" then add_to_query(type, :parent_ids, g2, any_none_key: :parent) { g2.to_i }
       # when "child" then q[:child] = g2.downcase
       # when "randseed" then q[:random_seed] = g2.to_i
-      # when "order" then q[:order] = g2.downcase
       # when "limit" # Do nothing. The controller takes care of it.
       # when "filetype", "-filetype", "~filetype", "type", "-type", "~type" then add_to_query(type, :filetype, g2)
       # when "description", "-description", "~description" then add_to_query(type, :description, g2)
@@ -1107,7 +1225,7 @@ class TagQueryTest < ActiveSupport::TestCase
           in_i = in_r.join(",").freeze
           in_f = "#{in_i},101".freeze
           in_r = [[:in, in_r].freeze].freeze
-          %w[id width height score favcount change tagcount].concat(TagCategory::SHORT_NAME_LIST.map { |e| "#{e}tags" }).freeze.each do |e|
+          %w[id width height score favcount change tagcount].concat(TagQuery::CATEGORY_METATAG_MAP.keys).freeze.each do |e|
             s_root = MAPPING[e.to_sym]
             prefixes.each do |prefix|
               p, s = prefix
@@ -1189,6 +1307,70 @@ class TagQueryTest < ActiveSupport::TestCase
           })
         end
       end
+
+      # when "order" then q[:order] = TagQuery.normalize_order_value(g2.downcase.strip, invert: type == :must_not)
+      context "Order:" do
+        context "Inversion & Normalization" do
+          should "remain the same for Non-aliased and non-invertible values" do
+            assert_equal("rank",             TagQuery.new("order:rank")[:order])
+            assert_equal("random",           TagQuery.new("order:random")[:order])
+            assert_equal("rank",             TagQuery.new("-order:rank")[:order])
+            assert_equal("random",           TagQuery.new("-order:random")[:order])
+          end
+
+          should "invert & normalize order values" do
+            # Non-aliased invertible tags should work correctly
+            # Normalize
+            assert_equal("duration",         TagQuery.new("order:duration")[:order])
+            assert_equal("duration",         TagQuery.new("order:duration_desc")[:order])
+            assert_equal("duration_asc",     TagQuery.new("order:duration_asc")[:order])
+
+            # Invert
+            assert_equal("duration_asc",     TagQuery.new("-order:duration")[:order])
+            assert_equal("duration",         TagQuery.new("-order:duration_asc")[:order])
+            assert_equal("duration_asc",     TagQuery.new("-order:duration_desc")[:order])
+          end
+
+          should "properly handle aliased values" do
+            # Don't resolve
+            assert_equal("updated",          TagQuery.new("order:updated")[:order])
+            assert_equal("updated_asc",      TagQuery.new("order:updated_asc")[:order])
+
+            # Aliased values should be correctly resolved
+            assert_equal("updated",          TagQuery.new("order:updated_at")[:order])
+            assert_equal("updated",          TagQuery.new("order:updated_at_desc")[:order])
+            assert_equal("updated_asc",      TagQuery.new("order:updated_at_asc")[:order])
+
+            # Correctly resolved & inverted
+            assert_equal("updated",          TagQuery.new("-order:updated_at_asc")[:order])
+            assert_equal("updated_asc",      TagQuery.new("-order:updated_at_desc")[:order])
+            assert_equal("updated_asc",      TagQuery.new("-order:updated_at")[:order])
+          end
+
+          should "properly handle aliases that don't allow suffixes" do
+            # Don't resolve
+            assert_equal("aspect_ratio",     TagQuery.new("order:aspect_ratio")[:order])
+            assert_equal("aspect_ratio_asc", TagQuery.new("order:aspect_ratio_asc")[:order])
+
+            # Non-suffixed aliases should be correctly resolved
+            assert_equal("aspect_ratio_asc", TagQuery.new("order:portrait")[:order])
+            assert_equal("aspect_ratio",     TagQuery.new("order:landscape")[:order])
+
+            # Correctly resolved & inverted
+            assert_equal("aspect_ratio_asc", TagQuery.new("-order:landscape")[:order])
+            assert_equal("aspect_ratio",     TagQuery.new("-order:portrait")[:order])
+          end
+
+          should "correctly handle the id special case" do
+            assert_equal("id",               TagQuery.new("order:id")[:order])
+            assert_equal("id_desc",          TagQuery.new("order:id_desc")[:order])
+            assert_equal("id",               TagQuery.new("order:id_asc")[:order])
+            assert_equal("id_desc",          TagQuery.new("-order:id")[:order])
+            assert_equal("id",               TagQuery.new("-order:id_desc")[:order])
+            assert_equal("id_desc",          TagQuery.new("-order:id_asc")[:order])
+          end
+        end
+      end
     end
 
     # should "correctly handle valid quoted metatags" do
@@ -1197,6 +1379,18 @@ class TagQueryTest < ActiveSupport::TestCase
     #   query = TagQuery.new('user:hash description:" a description w/ some stuff" delreason:"a good one"')
     #   assert_equal()
     # end
+
+    context "While unnesting a single unprefixed group" do
+      should "fail for more than #{TagQuery::DEPTH_LIMIT} levels of group nesting" do
+        assert_raise(TagQuery::DepthExceededError) do
+          TagQuery.new((0..(TagQuery::DEPTH_LIMIT - 1)).inject("rating:s") { |accumulator, _| "( #{accumulator} )" }, error_on_depth_exceeded: true)
+        end
+      end
+
+      should "not fail for less than or equal to #{TagQuery::DEPTH_LIMIT} levels of group nesting" do
+        TagQuery.new((0...(TagQuery::DEPTH_LIMIT - 1)).inject("rating:s") { |accumulator, _| "( #{accumulator} )" }, error_on_depth_exceeded: true)
+      end
+    end
   end
 
   # TODO: expand to all valid candidates
@@ -1233,29 +1427,6 @@ class TagQueryTest < ActiveSupport::TestCase
       TagQuery.scan_recursive((0...(TagQuery::DEPTH_LIMIT - 1)).inject("rating:s") { |accumulator, _| "a ( #{accumulator} )" }, error_on_depth_exceeded: true)
       # mixed level query
       TagQuery.scan_recursive((0...(TagQuery::DEPTH_LIMIT - 1)).inject("rating:s") { |accumulator, v| "#{v.even? ? 'a ' : ''}( #{accumulator} )" }, error_on_depth_exceeded: true)
-    end
-  end
-
-  context "While hoisting through the constructor" do
-    should "fail for more than #{TagQuery::DEPTH_LIMIT} levels of group nesting" do
-      assert_raise(TagQuery::DepthExceededError) do
-        TagQuery.new("aaa #{(0..(TagQuery::DEPTH_LIMIT - 1)).inject('limit:10') { |accumulator, _| "( #{accumulator} )" }}", error_on_depth_exceeded: true)
-      end
-    end
-    should "not fail for less than or equal to #{TagQuery::DEPTH_LIMIT} levels of group nesting" do
-      TagQuery.new("aaa #{(0...(TagQuery::DEPTH_LIMIT - 1)).inject('limit:10') { |accumulator, _| "( #{accumulator} )" }}", error_on_depth_exceeded: true)
-    end
-  end
-
-  context "While unpacking a search of a single group through the constructor" do
-    should "fail for more than #{TagQuery::DEPTH_LIMIT} levels of group nesting" do
-      assert_raise(TagQuery::DepthExceededError) do
-        TagQuery.new((0..(TagQuery::DEPTH_LIMIT - 1)).inject("rating:s") { |accumulator, _| "( #{accumulator} )" }, error_on_depth_exceeded: true)
-      end
-    end
-
-    should "not fail for less than or equal to #{TagQuery::DEPTH_LIMIT} levels of group nesting" do
-      TagQuery.new((0...(TagQuery::DEPTH_LIMIT - 1)).inject("rating:s") { |accumulator, _| "( #{accumulator} )" }, error_on_depth_exceeded: true)
     end
   end
 
@@ -1307,6 +1478,8 @@ class TagQueryTest < ActiveSupport::TestCase
         assert_not(TagQuery.should_hide_deleted_posts?("aaa bbb status:deleted"))
         assert_not(TagQuery.should_hide_deleted_posts?("aaa bbb deletedby:someone"))
         assert_not(TagQuery.should_hide_deleted_posts?("aaa bbb delreason:something"))
+        # In prior versions, deleted filtering was based of the final value of `status`/`status_must_not`, so the metatag ordering changed the results. This ensures this legacy behavior stays gone.
+        assert_not(TagQuery.should_hide_deleted_posts?("aaa bbb delreason:something status:pending"))
         assert_not(TagQuery.should_hide_deleted_posts?("aaa bbb -status:active"))
         assert(TagQuery.should_hide_deleted_posts?("aaa bbb status:modqueue"))
         assert(TagQuery.should_hide_deleted_posts?("( aaa bbb )"))
@@ -1314,39 +1487,103 @@ class TagQueryTest < ActiveSupport::TestCase
         assert(TagQuery.should_hide_deleted_posts?("( aaa ( bbb ) )"))
         assert_not(TagQuery.should_hide_deleted_posts?("aaa ( bbb ( aaa status:any ) )"))
         assert_not(TagQuery.should_hide_deleted_posts?("aaa ( bbb ( aaa deletedby:someone ) )"))
+        # In prior versions, deleted filtering was based of the final value of `status`/`status_must_not`, so the metatag ordering changed the results. This ensures this legacy behavior stays gone.
         assert_not(TagQuery.should_hide_deleted_posts?("aaa ( bbb ( aaa delreason:something ) status:pending )"))
         assert(TagQuery.should_hide_deleted_posts?("aaa ( bbb ( aaa ) status:pending )"))
         assert(TagQuery.should_hide_deleted_posts?("aaa ( bbb status:modqueue )"))
       end
 
       should "work with an array" do
-        kwargs = { hoisted_metatags: nil }.freeze
-        assert(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa bbb", **kwargs)))
-        assert_not(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa bbb status:deleted", **kwargs)))
-        assert_not(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa bbb deletedby:someone", **kwargs)))
-        assert_not(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa bbb delreason:something", **kwargs)))
-        assert_not(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa bbb -status:active", **kwargs)))
-        assert(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa bbb status:modqueue", **kwargs)))
-        assert(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("( aaa bbb )", **kwargs)))
-        assert_not(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa ( bbb status:any )", **kwargs)))
-        assert(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("( aaa ( bbb ) )", **kwargs)))
-        assert_not(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa ( bbb ( aaa status:any ) )", **kwargs)))
-        assert_not(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa ( bbb ( aaa deletedby:someone ) )", **kwargs)))
-        assert_not(TagQuery.should_hide_deleted_posts?(TagQuery.scan_search("aaa ( bbb ( aaa delreason:something ) status:pending )", **kwargs)))
+        assert(TagQuery.should_hide_deleted_posts?(%w[aaa bbb]))
+        assert_not(TagQuery.should_hide_deleted_posts?(%w[aaa bbb status:deleted]))
+        assert_not(TagQuery.should_hide_deleted_posts?(%w[aaa bbb deletedby:someone]))
+        assert_not(TagQuery.should_hide_deleted_posts?(%w[aaa bbb delreason:something]))
+        assert_not(TagQuery.should_hide_deleted_posts?(%w[aaa bbb -status:active]))
+        assert(TagQuery.should_hide_deleted_posts?(%w[aaa bbb status:modqueue]))
+        assert(TagQuery.should_hide_deleted_posts?(["( aaa bbb )"]))
+        assert_not(TagQuery.should_hide_deleted_posts?(["aaa", "( bbb status:any )"]))
+        assert(TagQuery.should_hide_deleted_posts?(["( aaa ( bbb ) )"]))
+        assert_not(TagQuery.should_hide_deleted_posts?(["aaa", "( bbb ( aaa status:any ) )"]))
+        assert_not(TagQuery.should_hide_deleted_posts?(["aaa", "( bbb ( aaa deletedby:someone ) )"]))
+        # In prior versions, deleted filtering was based of the final value of `status`/`status_must_not`, so the metatag ordering changed the results. This ensures this legacy behavior stays gone.
+        assert_not(TagQuery.should_hide_deleted_posts?(["aaa", "( bbb ( aaa delreason:something ) status:pending )"]))
       end
     end
 
     should "work after parsing" do
-      assert(TagQuery.new("aaa bbb").hide_deleted_posts?)
-      assert_not(TagQuery.new("aaa bbb status:deleted").hide_deleted_posts?)
-      assert_not(TagQuery.new("aaa bbb deletedby:someone").hide_deleted_posts?)
-      assert_not(TagQuery.new("aaa bbb delreason:something status:pending").hide_deleted_posts?)
-      assert(TagQuery.new("( aaa bbb )").hide_deleted_posts?)
-      assert(TagQuery.new("aaa ( bbb status:any )").hide_deleted_posts?)
-      assert(TagQuery.new("( aaa ( bbb ) )").hide_deleted_posts?)
-      assert(TagQuery.new("aaa ( bbb ( aaa status:any ) )").hide_deleted_posts?)
-      assert(TagQuery.new("aaa ( bbb ( aaa deletedby:someone ) )").hide_deleted_posts?)
-      assert(TagQuery.new("aaa ( bbb ( aaa delreason:something ) status:pending )").hide_deleted_posts?)
+      tq = TagQuery.new("aaa bbb")
+      assert(tq.hide_deleted_posts?(at_any_level: false))
+      assert(tq.hide_deleted_posts?(at_any_level: true))
+      tq = TagQuery.new("aaa bbb status:deleted")
+      assert_not(tq.hide_deleted_posts?(at_any_level: false))
+      assert_not(tq.hide_deleted_posts?(at_any_level: true))
+      tq = TagQuery.new("aaa bbb deletedby:someone")
+      assert_not(tq.hide_deleted_posts?(at_any_level: false))
+      assert_not(tq.hide_deleted_posts?(at_any_level: true))
+      # In prior versions, deleted filtering was based of the final value of `status`/`status_must_not`, so the metatag ordering changed the results. This ensures this legacy behavior stays gone.
+      tq = TagQuery.new("aaa bbb delreason:something status:pending")
+      assert_not(tq.hide_deleted_posts?(at_any_level: false))
+      assert_not(tq.hide_deleted_posts?(at_any_level: true))
+      tq = TagQuery.new("( aaa bbb )")
+      assert(tq.hide_deleted_posts?(at_any_level: false))
+      assert(tq.hide_deleted_posts?(at_any_level: true))
+      tq = TagQuery.new("( aaa ( bbb ) )")
+      assert(tq.hide_deleted_posts?(at_any_level: false))
+      assert(tq.hide_deleted_posts?(at_any_level: true))
+      [true, false].each do |e|
+        msg = -"process_groups: #{e}"
+        tq = TagQuery.new("aaa ( bbb status:any )", process_groups: e)
+        assert(tq.hide_deleted_posts?(at_any_level: false), "#{msg}; #{tq.q}")
+        assert_not(tq.hide_deleted_posts?(at_any_level: true), "#{msg}; #{tq.q}")
+        tq = TagQuery.new("aaa ( bbb ( aaa status:any ) )", process_groups: e)
+        assert(tq.hide_deleted_posts?(at_any_level: false), "#{msg}; #{tq.q}")
+        assert_not(tq.hide_deleted_posts?(at_any_level: true), "#{msg}; #{tq.q}")
+        tq = TagQuery.new("aaa ( bbb ( aaa deletedby:someone ) )", process_groups: e)
+        assert(tq.hide_deleted_posts?(at_any_level: false), "#{msg}; #{tq.q}")
+        assert_not(tq.hide_deleted_posts?(at_any_level: true), "#{msg}; #{tq.q}")
+        tq = TagQuery.new("aaa ( bbb ( aaa delreason:something ) status:pending )", process_groups: e)
+        assert(tq.hide_deleted_posts?(at_any_level: false), "#{msg}; #{tq.q}")
+        assert_not(tq.hide_deleted_posts?(at_any_level: true), "#{msg}; #{tq.q}")
+      end
+    end
+  end
+
+  # TODO: Test w/ at_any_level: false
+  context "When determining whether or not to append '-status:deleted'" do
+    should "work with a string" do
+      assert(TagQuery.can_append_deleted_filter?("aaa bbb"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa bbb status:deleted"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa bbb deletedby:someone"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa bbb delreason:something"), at_any_level: true)
+      # In prior versions, deleted filtering was based of the final value of `status`/`status_must_not`, so the metatag ordering changed the results. This ensures this legacy behavior stays gone.
+      assert_not(TagQuery.can_append_deleted_filter?("aaa bbb delreason:something status:pending"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa bbb -status:active"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa bbb status:modqueue"), at_any_level: true)
+      assert(TagQuery.can_append_deleted_filter?("( aaa bbb )"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa ( bbb status:any )"), at_any_level: true)
+      assert(TagQuery.can_append_deleted_filter?("( aaa ( bbb ) )"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa ( bbb ( aaa status:any ) )"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa ( bbb ( aaa deletedby:someone ) )"), at_any_level: true)
+      # In prior versions, deleted filtering was based of the final value of `status`/`status_must_not`, so the metatag ordering changed the results. This ensures this legacy behavior stays gone.
+      assert_not(TagQuery.can_append_deleted_filter?("aaa ( bbb ( aaa delreason:something ) status:pending )"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa ( bbb ( aaa ) status:pending )"), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?("aaa ( bbb status:modqueue )"), at_any_level: true)
+    end
+
+    should "work with an array" do
+      assert(TagQuery.can_append_deleted_filter?(%w[aaa bbb]), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?(%w[aaa bbb status:deleted]), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?(%w[aaa bbb deletedby:someone]), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?(%w[aaa bbb delreason:something]), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?(%w[aaa bbb -status:active]), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?(%w[aaa bbb status:modqueue]), at_any_level: true)
+      assert(TagQuery.can_append_deleted_filter?(["( aaa bbb )"]), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?(["aaa", "( bbb status:any )"]), at_any_level: true)
+      assert(TagQuery.can_append_deleted_filter?(["( aaa ( bbb ) )"]), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?(["aaa", "( bbb ( aaa status:any ) )"]), at_any_level: true)
+      assert_not(TagQuery.can_append_deleted_filter?(["aaa", "( bbb ( aaa deletedby:someone ) )"]), at_any_level: true)
+      # In prior versions, deleted filtering was based of the final value of `status`/`status_must_not`, so the metatag ordering changed the results. This ensures this legacy behavior stays gone.
+      assert_not(TagQuery.can_append_deleted_filter?(["aaa", "( bbb ( aaa delreason:something ) status:pending )"]), at_any_level: true)
     end
   end
 

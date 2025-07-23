@@ -36,7 +36,7 @@ module Danbooru
     end
 
     def takedown_email
-      "management@#{domain}"
+      "takedowns@#{domain}"
     end
 
     # System actions, such as sending automated dmails, will be performed with
@@ -108,7 +108,11 @@ module Danbooru
 
     # Thumbnail size
     def small_image_width
-      150
+      256
+    end
+
+    def webp_previews_enabled?
+      false
     end
 
     # Large resize image width. Set to nil to disable.
@@ -117,7 +121,7 @@ module Danbooru
     end
 
     def large_image_prefix
-      "sample-"
+      ""
     end
 
     def protected_path_prefix
@@ -138,6 +142,10 @@ module Danbooru
 
     def deleted_preview_url
       "/images/deleted-preview.png"
+    end
+
+    def blank_preview_url
+      "/images/blank.png"
     end
 
     # When calculating statistics based on the posts table, gather this many posts to sample from.
@@ -267,7 +275,7 @@ module Danbooru
     end
 
     def post_replacement_per_post_limit
-      5
+      3
     end
 
     def remember_key
@@ -363,6 +371,7 @@ module Danbooru
         "png" => 100.megabytes,
         "gif" => 20.megabytes,
         "webm" => 100.megabytes,
+        "mp4" => 100.megabytes,
       }
     end
 
@@ -524,8 +533,8 @@ module Danbooru
         "Young [[human]]-[[humanoid|like]] character in an explicit situation",
         "",
         "Paysite/commercial content",
-        "Traced artwork",
-        "Traced artwork (post #%PARENT_ID%)",
+        "Trace of another artist's work",
+        "Trace of another artist's work (post #%PARENT_ID%)",
         "Takedown #%OTHER_ID%",
         "The artist of this post is on the \"avoid posting list\":/static/avoid_posting",
         "[[conditional_dnp|Conditional DNP]] (Only the artist is allowed to post)",
@@ -672,11 +681,38 @@ module Danbooru
       { "720p" => [1280, 720], "480p" => [640, 480] }
     end
 
+    # Threshold at which an alternate version of the original video will be generated
+    # The new video will have this value as its smallest dimension.
+    def video_variant
+      1080
+    end
+
+    # Additional video samples will be generated in these dimensions if it makes sense to do so.
+    # They will be available as additional scale options on applicable posts in the order they appear here.
+    def video_samples
+      {
+        "720p": {
+          clamp: 720,
+          maxrate: 1,
+          bufsize: 2,
+        },
+        "480p": {
+          clamp: 480,
+          maxrate: 1,
+          bufsize: 2,
+        },
+      }
+    end
+
     def image_rescales
       []
     end
 
     def enable_visitor_metrics?
+      false
+    end
+
+    def fsc_modal_enabled?
       false
     end
 

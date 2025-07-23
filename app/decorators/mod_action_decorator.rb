@@ -148,6 +148,8 @@ class ModActionDecorator < ApplicationDecorator
       "#{vals['disabled'] ? 'Disabled' : 'Enabled'} uploading for #{user}"
     when "user_name_change"
       "Changed name of #{user}"
+    when "user_flush_favorites"
+      "Cleared favorites of #{user}"
 
       ### User Record ###
 
@@ -252,6 +254,11 @@ class ModActionDecorator < ApplicationDecorator
       end
     when "blip_unhide"
       "Unhid blip ##{vals['blip_id']} by #{user}"
+
+      ### Tag ###
+
+    when "tag_destroy"
+      "Destroyed tag `#{vals['name']}`"
 
       ### Alias ###
 
@@ -387,6 +394,12 @@ class ModActionDecorator < ApplicationDecorator
 
     when "bulk_revert"
       "Processed bulk revert for #{vals['constraints']} by #{user}"
+
+      ### Post Versions
+    when "post_version_hide"
+      "Hidden post version \"#{vals['version']}\":/post_versions?search[post_id]=#{vals['post_id']} on post ##{vals['post_id']}"
+    when "post_version_unhide"
+      "Restored post version \"#{vals['version']}\":/post_versions?search[post_id]=#{vals['post_id']} on post ##{vals['post_id']}"
 
       ### Legacy Post Events ###
     when "post_move_favorites"

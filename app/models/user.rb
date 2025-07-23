@@ -429,10 +429,11 @@ class User < ApplicationRecord
 
     def upload_reason_string(reason)
       reasons = {
-          REJ_UPLOAD_HOURLY: "have reached your hourly upload limit",
-          REJ_UPLOAD_EDIT: "have no remaining tag edits available",
-          REJ_UPLOAD_LIMIT: "have reached your upload limit",
-          REJ_UPLOAD_NEWBIE: "cannot upload during your first week"
+        REJ_UPLOAD_HOURLY: "have reached your hourly upload limit",
+        REJ_UPLOAD_EDIT: "have no remaining tag edits available",
+        REJ_UPLOAD_LIMIT: "have reached your upload limit",
+        REJ_UPLOAD_NEWBIE: "cannot upload during your first week",
+        REJ_UPLOAD_DISABLED: "are not allowed to upload posts",
       }
       reasons.fetch(reason, "unknown upload rejection reason")
     end
@@ -497,9 +498,17 @@ class User < ApplicationRecord
                          nil, 7.days)
     create_user_throttle(:comment_vote, ->{ Danbooru.config.comment_vote_limit - CommentVote.for_user(id).where("created_at > ?", 1.hour.ago).count },
                          :general_bypass_throttle?, 3.days)
-    create_user_throttle(:post_vote, ->{ Danbooru.config.post_vote_limit - PostVote.for_user(id).where("created_at > ?", 1.hour.ago).count },
-                         :general_bypass_throttle?, nil)
-    create_user_throttle(:post_flag, ->{ Danbooru.config.post_flag_limit - PostFlag.for_creator(id).where("created_at > ?", 1.hour.ago).count },
+    create_user_throttle(:post_vote, -> {
+      # This looks horrid, but it does seem to be the fastest way to check if the user has hit the hourly post vote limit.
+      # With a limited dataset, this query is about 3-4 times faster than a straightforward count.
+      result = ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([
+        "SELECT COUNT(*) FROM ( SELECT post_id FROM post_votes WHERE user_id = ? AND created_at > ? LIMIT ? ) as a;",
+        id, 1.hour.ago, Danbooru.config.post_vote_limit + 1,
+      ]))
+      return false if result.blank?
+      Danbooru.config.post_vote_limit - result[0].count
+    }, :general_bypass_throttle?, nil)
+    create_user_throttle(:post_flag, -> { Danbooru.config.post_flag_limit - PostFlag.for_creator(id).where("created_at > ?", 1.hour.ago).count },
                          :can_approve_posts?, 3.days)
     create_user_throttle(:ticket, ->{ Danbooru.config.ticket_limit - Ticket.for_creator(id).where("created_at > ?", 1.hour.ago).count },
                          :general_bypass_throttle?, 3.days)
@@ -549,10 +558,12 @@ class User < ApplicationRecord
     end
 
     def can_upload_with_reason
-      if hourly_upload_limit <= 0 && !Danbooru.config.disable_throttles?
+      if no_uploading?
+        :REJ_UPLOAD_DISABLED
+      elsif hourly_upload_limit <= 0 && !Danbooru.config.disable_throttles?
         :REJ_UPLOAD_HOURLY
       elsif can_upload_free? || is_admin?
-          true
+        true
       elsif younger_than(7.days)
         :REJ_UPLOAD_NEWBIE
       elsif !is_privileged? && post_edit_limit <= 0 && !Danbooru.config.disable_throttles?
@@ -672,7 +683,7 @@ class User < ApplicationRecord
           :custom_style, :favorite_count,
           :api_regen_multiplier, :api_burst_limit, :remaining_api_limit,
           :statement_timeout, :favorite_limit,
-          :tag_query_limit, :has_mail?
+          :tag_query_limit, :has_mail?, :unread_dmail_count,
         ]
       end
 
@@ -933,6 +944,15 @@ class User < ApplicationRecord
 
   def has_mail?
     unread_dmail_count > 0
+  end
+
+  def recalculate_unread_dmail_count!
+    update_columns(unread_dmail_count: dmails.unread.count)
+    reload
+  end
+
+  def has_custom_style?
+    custom_style.present? && !custom_style.strip.empty?
   end
 
   def hide_favorites?

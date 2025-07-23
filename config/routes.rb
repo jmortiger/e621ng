@@ -272,6 +272,8 @@ Rails.application.routes.draw do
   resources :post_versions, :only => [:index] do
     member do
       put :undo
+      put :hide
+      put :unhide
     end
   end
   resource :related_tag, :only => [:show, :update]
@@ -307,6 +309,8 @@ Rails.application.routes.draw do
     member do
       get :upload_limit
       get :toggle_uploads
+      post :flush_favorites
+      get :fix_counts
     end
 
     collection do
@@ -481,6 +485,7 @@ Rails.application.routes.draw do
   get "/static/theme" => "static#theme", as: "theme"
   get "/static/avoid_posting" => "static#avoid_posting", as: "avoid_posting_static"
   get "/static/subscribestar" => "static#subscribestar", as: "subscribestar"
+  get "/static/furid" => "static#furid", as: "furid"
   get "/meta_searches/tags" => "meta_searches#tags", :as => "meta_searches_tags"
 
   root :to => "static#home"
