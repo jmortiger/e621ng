@@ -5,12 +5,12 @@ class Dmail < ApplicationRecord
   validates :title, :body, presence: { on: :create }
   validates :title, length: { minimum: 1, maximum: 250 }
   validates :body, length: { minimum: 1, maximum: Danbooru.config.dmail_max_size }
-  validate :recipient_accepts_dmails, on: :create
+  validate :recipient_accepts_dmails?, on: :create
   validate :user_not_limited, on: :create
 
-  belongs_to :owner, :class_name => "User"
-  belongs_to :to, :class_name => "User"
-  belongs_to :from, :class_name => "User"
+  belongs_to :owner, class_name: "User"
+  belongs_to :to, class_name: "User"
+  belongs_to :from, class_name: "User"
 
   after_initialize :initialize_attributes, if: :new_record?
   before_create :auto_read_if_filtered
@@ -151,17 +151,19 @@ class Dmail < ApplicationRecord
     day_allowed = CurrentUser.can_dmail_day_with_reason
     if day_allowed != true
       errors.add(:base, "Sender #{User.throttle_reason(day_allowed, 'daily')}")
-      return
     end
   end
 
-  def recipient_accepts_dmails
+  # Checks if this Dmail will be accepted by the recipient.
+  # * Can't reject automated & staff dmails
+  # * If blocking user dmails, can't send dmails to non-staff users
+  # * Can't send dmails to users who are blacklisting you
+  def recipient_accepts_dmails?
     unless to
       errors.add(:to_name, "not found")
       return false
     end
-    return true if from_id == User.system.id
-    return true if from.is_janitor?
+    return true if from_id == User.system.id || from.is_janitor?
     if to.disable_user_dmails
       errors.add(:to_name, "has disabled DMails")
       return false
@@ -174,14 +176,16 @@ class Dmail < ApplicationRecord
       errors.add(:to_name, "does not wish to receive DMails from you")
       return false
     end
+    true
   end
 
+  # Wraps this DMail's content in a DText quote block preceded by the sending user's `pretty_name`.
   def quoted_body
     "[quote]\n#{from.pretty_name} said:\n\n#{body}\n[/quote]\n\n"
   end
 
   def send_email
-    if to.receive_email_notifications? && to.email =~ /@/ && owner_id == to.id
+    if to.receive_email_notifications? && to.email.include?("@") && owner_id == to.id
       UserMailer.dmail_notice(self).deliver_now
     end
   end
@@ -217,8 +221,8 @@ class Dmail < ApplicationRecord
   end
 
   def visible_to?(user)
-    return true if user.is_moderator? && (from_id == User.system.id || Ticket.where(qtype: "dmail", disp_id: id).exists?)
-    return true if user.is_admin? && (to.is_admin? || from.is_admin?)
-    owner_id == user.id
+    (user.is_moderator? && (from_id == User.system.id || Ticket.where(qtype: "dmail", disp_id: id).exists?)) ||
+      (user.is_admin? && (to.is_admin? || from.is_admin?)) ||
+      (owner_id == user.id)
   end
 end
