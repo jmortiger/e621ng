@@ -96,6 +96,7 @@ class User < ApplicationRecord
   #after_create :notify_sock_puppets
   after_create :create_user_status
 
+  has_one :role
   has_one :api_key
   has_one :dmail_filter
   has_one :user_status
