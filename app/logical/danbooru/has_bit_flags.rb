@@ -13,12 +13,21 @@ module Danbooru
       # * `:readonly` [`nil`]: Is the bit flag field readonly?
       # * `:active_names` [`nil`]: Should the `active_#{field}` getters & setters be defined?
       # * `:calculate_bit_flags` [`nil`]: Should the `calculate_#{field}_value` singleton method be defined?
+      # * `:skip_statics` [`nil`]: If already manually created, don't create static methods.
       # * `:composed` [`nil`]: Should this be made of multiple bit fields; 1 that's editable, & another that is composed with it by a logical AND/OR/XOR?
       #    * `:main` {`String`}: The main, editable bit field
       #    * ***One*** of the following:
       #       * `:xor` {`String`}
-      #       * `:and` {`String`}
-      #       * `:or` {`String`}
+      #       * `:and` {`String`}: Can't always set resultant flag
+      #       * `:or` {`String`}: Can't always clear resultant flag
+      # * `:wrapper_prefix` [`nil`] {`String`}: the prefix to apply to each attribute to get the wrapper method name.
+      # * `:wrapper_suffix` [`nil`] {`String`}: the suffix to apply to each attribute to get the wrapper method name.
+      # * `:wrappers` [`nil`] {`Hash<String, Proc | nil>`}: methods to wrap attribute getter/setters in; can be used to add additional logic to their outputs.
+      # #### Block
+      # If defined, used instead of `:wrappers` to create wrapper methods.
+      # * `attribute` {`String`}: the attribute name we're defining
+      #
+      # Returns a 2-element array w/ the getter & the setter respectively.
       #
       # NOTE: the ordering of attributes has to be fixed#
       # new attributes should be appended to the end.
@@ -36,6 +45,58 @@ module Danbooru
           end
 
         end
+
+        define_static_bit_field_methods(attributes, **options) unless options[:skip_statics]
+
+        attributes.each.with_index do |attribute, i|
+          # NOTE: Will this be the right size? Could screw up clearing a flag if not.
+          bit_flag = 1 << i
+
+          define_method("set_#{attribute}") { send("#{field}=", send(field) | bit_flag) }
+          define_method("clear_#{attribute}") { send("#{field}=", send(field) & ~bit_flag) }
+          if op == "^"
+            define_method(attribute) { ((send(field) & bit_flag) ^ (send(other_field) & bit_flag)) > 0 }
+            unless options[:readonly]
+              define_method("#{attribute}=") do |val|
+                send("#{
+                    if val.to_s =~ /t|1|y/
+                      (send(other_field) & bit_flag) == bit_flag ? 'clear' : 'set' # rubocop:disable Metrics/BlockNesting
+                    else # Set both or clear both
+                      (send(other_field) & bit_flag) == bit_flag ? 'set' : 'clear' # rubocop:disable Metrics/BlockNesting
+                    end
+                  }_#{attribute}")
+                # val = (val.to_s =~ /t|1|y/)
+                # send("#{
+                #     (val && (send(other_field) & bit_flag) == bit_flag) || (!val && (send(other_field) & bit_flag) != bit_flag) ? 'clear' : 'set'
+                #   }_#{attribute}")
+              end
+            end
+          else
+            define_method(attribute) { send(field) & bit_flag > 0 }
+            define_method("#{attribute}=") { |v| send("#{v.to_s =~ /t|1|y/ ? 'set' : 'clear'}_#{attribute}") } unless options[:readonly]
+          end
+          send(:alias_method, :"#{attribute}?", attribute.to_sym)
+        end
+
+        if options[:active_names]
+          # Returns the currently active flags by name
+          define_method("active_#{field}") { attributes.select { |e| send("#{e}?") } }
+
+          unless options[:readonly]
+            # Sets the currently active flags by name
+            define_method("active_#{field}=") do |vals|
+              vals.each { |e| send("#{e}=", true) }
+              (attributes - vals).each { |e| send("#{e}=", false) }
+            end
+
+            # Sets the specified flags to active by name
+            define_method("active_#{field}|=") { |vals| vals.each { |e| send("#{e}=", true) } }
+          end
+        end
+      end
+
+      def define_static_bit_field_methods(attributes, **options)
+        field = options[:field] || options[:composed]&.send(:[], :main) || :bit_flags
 
         if options[:index_getters]
           define_singleton_method("flag_index_for") do |key|
@@ -56,103 +117,9 @@ module Danbooru
         attributes.each.with_index do |attribute, i|
           bit_flag = 1 << i
 
-          define_method("set_#{attribute}") { send("#{field}=", send(field) | bit_flag) }
-          define_method("clear_#{attribute}") { send("#{field}=", send(field) & ~bit_flag) }
-          getter, setter = case op
-                           when "^"
-                             [
-                               -> do
-                                 ((send(field) & bit_flag) ^ (send(other_field) & bit_flag)) > 0
-                               end,
-                               ->(val) do
-                                 send(
-                                   "#{field}=",
-                                   if val.to_s =~ /t|1|y/
-                                     if (send(other_field) & bit_flag) == bit_flag
-                                       send("clear_#{attribute}")
-                                     else
-                                       send("set_#{attribute}")
-                                     end
-                                   elsif (send(other_field) & bit_flag) != bit_flag
-                                     send("clear_#{attribute}")
-                                   else
-                                     send("set_#{attribute}")
-                                   end,
-                                 )
-                               end,
-                             ]
-                             #  when "|"
-                             #    [
-                             #      ->() do
-                             #       ((send(field) & bit_flag) | (send(other_field) & bit_flag)) > 0
-                             #      end,
-                             #      ->(val) do
-                             #        if val.to_s =~ /t|1|y/
-                             #          send("#{field}=", send(field) | bit_flag)
-                             #        else
-                             #          send("#{field}=", send(field) & ~bit_flag)
-                             #        end
-                             #      end,
-                             #    ]
-                             #  when "&"
-                             #    [
-                             #      ->() do
-                             #       ((send(field) & bit_flag) & (send(other_field) & bit_flag)) > 0
-                             #      end,
-                             #      ->(val) do
-                             #        if val.to_s =~ /t|1|y/
-                             #          send("#{field}=", send(field) | bit_flag)
-                             #        else
-                             #          send("#{field}=", send(field) & ~bit_flag)
-                             #        end
-                             #      end,
-                             #    ]
-                           else
-                             [
-                               -> do
-                                 send(field) & bit_flag > 0
-                               end,
-                               ->(val) do
-                                 if val.to_s =~ /t|1|y/
-                                   send("#{field}=", send(field) | bit_flag)
-                                 else
-                                   send("#{field}=", send(field) & ~bit_flag)
-                                 end
-                               end,
-                             ]
-                           end
-          # getter = case op
-          #          when "^"
-          #            ->() do
-          #              ((send(field) & bit_flag) ^ (send(other_field) & bit_flag)) > 0
-          #            end
-          #          when "|"
-          #            ->() do
-          #              ((send(field) & bit_flag) | (send(other_field) & bit_flag)) > 0
-          #            end
-          #          when "&"
-          #            ->() do
-          #              ((send(field) & bit_flag) & (send(other_field) & bit_flag)) > 0
-          #            end
-          #          else
-          #            ->() do
-          #              send(field) & bit_flag > 0
-          #            end
-          #          end
-          define_method(attribute, getter)
-
-          send(:alias_method, :"#{attribute}?", attribute.to_sym)
-
-          next if options[:readonly]
-
-          define_method("#{attribute}=", setter)
-          # define_method("#{attribute}=") do |val|
-          #   if val.to_s =~ /t|1|y/
-          #     send("#{field}=", send(field) | bit_flag)
-          #   else
-          #     send("#{field}=", send(field) & ~bit_flag)
-          #   end
-          # end
+          define_singleton_method("#{attribute}_flag_index") { i }
+          define_singleton_method("#{attribute}_flag_bit") { bit_flag }
+          define_singleton_method("has_#{attribute}_set?") { |v| (bit_flag & v) > 0 }
         end
 
         if options[:active_names]
