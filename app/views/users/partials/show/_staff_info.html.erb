@@ -42,6 +42,7 @@
         <%= link_to "Enabled", toggle_uploads_user_path(user) %>
       <% end %>
       | <%= link_to "Refresh counts", fix_counts_user_path(user) %>
+      | <%= link_to "Times Toggled", action: "index", controller: "mod_actions", search: { action: "user_uploads_toggle", user_id: user.id } %>
     </span>
 
     <% if CurrentUser.is_moderator? && UserRevert.can_revert?(user) %>
