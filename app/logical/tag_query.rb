@@ -66,6 +66,8 @@ class TagQuery
     hassource hasdescription isparent ischild inpool pending_replacements artverified
   ].freeze
 
+  BOOLEAN_METATAGS_INVERT = BOOLEAN_MAP.map { |e| -"-#{e}" }.freeze
+
   CATEGORY_METATAG_MAP = TagCategory::SHORT_NAME_MAPPING.to_h { |k, v| [-"#{k}tags", -"tag_count_#{v}"] }.freeze
 
   NEGATABLE_METATAGS = %w[
@@ -420,6 +422,31 @@ class TagQuery
     value = ORDER_VALUE_INVERSIONS[value] || value if invert
     value
   end
+
+  # # Convert a boolean metatag into it's simplest consistent representation.
+  # # * Resolves inversions
+  # # * Doesn't strip whitespace
+  # # ### Parameters:
+  # # * `value`
+  # # * `invert` [`false`]
+  # # * `processed` [`true`]: is `value` downcased, stripped, & shed of the `<metatag>:`/`-<metatag>:` prefix?
+  # def self.normalize_boolean_value(value, invert: true, processed: true)
+  #   value.downcase! unless processed
+  #   unless processed || !(/\A(-)?[a-zA-Z_]+:(.+)\z/ =~ value)
+  #     invert = $1
+  #     value = parse_boolean($2)
+  #   end
+  #   # If inverted, resolve inversion
+  #   if invert
+  #     !value
+  #   else
+  #     value
+  #   end
+  # end
+  BOOLEAN_MAP = Hash.new { |_h, k| k }.merge({
+    ["-", true] => false,
+    ["-", false] => true,
+  }).freeze
 
   # Convert query into a consistent representation.
   # * Converts to string
@@ -1443,6 +1470,7 @@ class TagQuery
       when *COUNT_METATAGS then q[metatag_name.downcase.to_sym] = ParseValue.range(g2)
 
       when *BOOLEAN_METATAGS then q[metatag_name.downcase.to_sym] = parse_boolean(g2)
+      when *BOOLEAN_METATAGS_INVERT then q[metatag_name.downcase.to_sym] = !parse_boolean(g2)
 
       else
         add_tag(token)
