@@ -5,6 +5,7 @@ require "test_helper"
 class TagImplicationTest < ActiveSupport::TestCase
   context "A tag implication" do
     setup do
+      @bureaucrat = create(:bureaucrat_user)
       @admin = create(:admin_user)
       CurrentUser.user = @admin
       @user = create(:user, created_at: 1.month.ago)
@@ -17,16 +18,16 @@ class TagImplicationTest < ActiveSupport::TestCase
         create(:tag_implication, antecedent_name: "aaa", consequent_name: "bbb")
       end
 
-      should allow_value('active').for(:status)
-      should allow_value('deleted').for(:status)
-      should allow_value('pending').for(:status)
-      should allow_value('processing').for(:status)
-      should allow_value('queued').for(:status)
-      should allow_value('error: derp').for(:status)
+      should allow_value("active").for(:status)
+      should allow_value("deleted").for(:status)
+      should allow_value("pending").for(:status)
+      should allow_value("processing").for(:status)
+      should allow_value("queued").for(:status)
+      should allow_value("error: derp").for(:status)
 
-      should_not allow_value('ACTIVE').for(:status)
-      should_not allow_value('error').for(:status)
-      should_not allow_value('derp').for(:status)
+      should_not allow_value("ACTIVE").for(:status)
+      should_not allow_value("error").for(:status)
+      should_not allow_value("derp").for(:status)
 
       should allow_value(nil).for(:forum_topic_id)
       should_not allow_value(-1).for(:forum_topic_id).with_message("must exist", against: :forum_topic)
@@ -69,43 +70,132 @@ class TagImplicationTest < ActiveSupport::TestCase
 
       should "not allow creator" do
         assert_equal(false, @ti.approvable_by?(@user))
+        assert_equal(0, TagImplication.approvable_by(@user).count)
+      end
+
+      should "not allow mods" do
+        assert_equal(false, @ti.approvable_by?(@mod))
+        assert_equal(0, TagImplication.approvable_by(@mod).count)
+      end
+
+      should "allow bureaucrats" do
+        assert_equal(true, @ti.approvable_by?(@bureaucrat))
+        assert_equal(1, TagImplication.approvable_by(@bureaucrat).count)
       end
 
       should "allow admins" do
         assert_equal(true, @ti.approvable_by?(@admin))
+        assert_equal(1, TagImplication.approvable_by(@admin).count)
       end
 
-      should "now allow mods" do
-        assert_equal(false, @ti.approvable_by?(@mod))
-      end
+      context "w/ a dnp antecedent/consequent" do
+        should "not allow bureaucrats" do
+          assert_equal(false, @ti2.approvable_by?(@bureaucrat))
+          assert_equal(false, @ti3.approvable_by?(@bureaucrat))
+          assert_equal(1, TagImplication.approvable_by(@bureaucrat).count)
+        end
 
-      should "not allow admins if antecedent/consequent is dnp" do
-        assert_equal(false, @ti2.approvable_by?(@admin))
-        assert_equal(false, @ti3.approvable_by?(@admin))
-      end
+        should "not allow admins" do
+          assert_equal(false, @ti2.approvable_by?(@admin))
+          assert_equal(false, @ti3.approvable_by?(@admin))
+          assert_equal(1, TagImplication.approvable_by(@admin).count)
+        end
 
-      should "allow bd staff" do
-        assert_equal(true, @ti2.approvable_by?(@bd))
-        assert_equal(true, @ti3.approvable_by?(@bd))
+        should "allow bd staff" do
+          assert_equal(true, @ti2.approvable_by?(@bd))
+          assert_equal(true, @ti3.approvable_by?(@bd))
+          assert_equal(3, TagImplication.approvable_by(@bd).count)
+        end
       end
     end
 
+    # TODO: Test when status is retired, processing, & queued
     context "#deletable_by?" do
       setup do
-        @mod = create(:moderator_user)
-        @ti = as(@user) { create(:tag_implication, status: "pending") }
+        @other_user = create(:user)
+        @ti_p = as(@user) { create(:tag_implication, status: "pending") }
+        @ti_a = as(@user) { create(:tag_implication, status: "active") }
+        @ti_o = as(@other_user) { create(:tag_implication, status: "pending") }
+        @ti_d = as(@user) { create(:tag_implication, status: "deleted") }
       end
 
-      should "allow creator" do
-        assert_equal(true, @ti.deletable_by?(@user))
+      should "allow creator while pending" do
+        assert_equal(true, @ti_p.deletable_by?(@user))
+        assert_equal(false, @ti_o.deletable_by?(@user))
+        assert_equal(true, @ti_o.deletable_by?(@other_user))
+        assert_equal(false, @ti_p.deletable_by?(@other_user))
+        assert_equal(1, TagImplication.deletable_by(@user).count)
+        assert_equal(1, TagImplication.deletable_by(@other_user).count)
+      end
+
+      should "not allow creator when active" do
+        assert_equal(false, @ti_a.deletable_by?(@user))
+      end
+
+      should "not allow when already deleted" do
+        assert_equal(false, @ti_d.deletable_by?(@admin))
+        assert_equal(false, @ti_d.deletable_by?(@user))
       end
 
       should "allow admins" do
-        assert_equal(true, @ti.deletable_by?(@admin))
+        assert_equal(true, @ti_p.deletable_by?(@admin))
+        assert_equal(true, @ti_a.deletable_by?(@admin))
+        assert_equal(3, TagImplication.deletable_by(@admin).count)
       end
 
-      should "now allow mods" do
-        assert_equal(false, @ti.deletable_by?(@mod))
+      should "allow bureaucrats" do
+        assert_equal(true, @ti_p.deletable_by?(@bureaucrat))
+        assert_equal(true, @ti_a.deletable_by?(@bureaucrat))
+        assert_equal(3, TagImplication.deletable_by(@bureaucrat).count)
+      end
+
+      should "not allow mods" do
+        assert_equal(false, @ti_p.deletable_by?(@mod))
+        assert_equal(0, TagImplication.deletable_by(@mod).count)
+      end
+    end
+
+    # TODO: Test when status is retired, processing, & queued
+    context "#editable_by?" do
+      setup do
+        @other_user = create(:user)
+        @ti_p = as(@user) { create(:tag_implication, status: "pending") }
+        @ti_a = as(@user) { create(:tag_implication, status: "active") }
+        @ti_o = as(@other_user) { create(:tag_implication, status: "pending") }
+        @ti_d = as(@user) { create(:tag_implication, status: "deleted") }
+      end
+
+      should "not allow creator" do
+        assert_equal(false, @ti_p.editable_by?(@user))
+        assert_equal(false, @ti_o.editable_by?(@other_user))
+        assert_equal(0, TagImplication.editable_by(@user).count)
+        assert_equal(0, TagImplication.editable_by(@other_user).count)
+      end
+
+      should "not allow when not pending" do
+        assert_equal(false, @ti_d.editable_by?(@admin))
+        assert_equal(false, @ti_d.editable_by?(@bureaucrat))
+        assert_equal(false, @ti_d.editable_by?(@user))
+        assert_equal(false, @ti_a.editable_by?(@admin))
+        assert_equal(false, @ti_a.editable_by?(@bureaucrat))
+        assert_equal(false, @ti_a.editable_by?(@user))
+      end
+
+      should "allow admins" do
+        assert_equal(true, @ti_p.editable_by?(@admin))
+        assert_equal(true, @ti_o.editable_by?(@admin))
+        assert_equal(2, TagImplication.editable_by(@admin).count)
+      end
+
+      should "allow bureaucrats" do
+        assert_equal(true, @ti_p.editable_by?(@bureaucrat))
+        assert_equal(true, @ti_o.editable_by?(@bureaucrat))
+        assert_equal(2, TagImplication.editable_by(@bureaucrat).count)
+      end
+
+      should "not allow mods" do
+        assert_equal(false, @ti_p.editable_by?(@mod))
+        assert_equal(0, TagImplication.editable_by(@mod).count)
       end
     end
 
@@ -142,8 +232,8 @@ class TagImplicationTest < ActiveSupport::TestCase
 
       assert(ti1.valid?)
       assert(ti2.valid?)
-      refute(ti3.valid?)
-      assert_equal("Tag implication can not create a circular relation with another tag implication", ti3.errors.full_messages.join(""))
+      assert_not(ti3.valid?)
+      assert_equal("Tag implication can not create a circular relation with another tag implication", ti3.errors.full_messages.join)
     end
 
     should "not validate when a transitive relation is created" do
@@ -196,9 +286,7 @@ class TagImplicationTest < ActiveSupport::TestCase
       ti2 = create(:tag_implication, antecedent_name: "ccc", consequent_name: "ddd", status: "active")
       ti1.reload
       ti2.reload
-      ti2.update(
-        :antecedent_name => "bbb"
-      )
+      ti2.update(antecedent_name: "bbb")
       ti1.reload
       ti2.reload
       assert_equal(%w[bbb ddd], ti1.descendant_names)

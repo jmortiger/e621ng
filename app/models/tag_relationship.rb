@@ -31,6 +31,15 @@ class TagRelationship < ApplicationRecord
   validates :consequent_name, tag_name: true, if: :consequent_name_changed?
   validate :antecedent_and_consequent_are_different
 
+  scope :dnp_artist_consequent, -> { joins(consequent_tag: { artist: :avoid_posting }).where(avoid_postings_artists: { is_active: true }) }
+  scope :dnp_artist_antecedent, -> { joins(antecedent_tag: { artist: :avoid_posting }).where(avoid_postings_artists: { is_active: true }) }
+  scope :dnp_artist, -> { left_joins(consequent_tag: { artist: :avoid_posting }, antecedent_tag: { artist: :avoid_posting }).where(avoid_postings_artists: { is_active: true }) }
+  scope :no_dnp_artist, -> {
+    tr = left_joins(consequent_tag: { artist: :avoid_posting }, antecedent_tag: { artist: :avoid_posting })
+    tr.where.not(consequent_tag: { artists: { avoid_posting: true } })
+      .and(tr.where.not(antecedent_tag: { artists: { avoid_posting: true } }))
+  }
+
   def initialize_creator
     self.creator_id = CurrentUser.user.id
     self.creator_ip_addr = CurrentUser.ip_addr
@@ -54,37 +63,59 @@ class TagRelationship < ApplicationRecord
     status.in?(%w[active processing queued])
   end
 
-  def is_retired?
-    status == "retired"
-  end
-
-  def is_deleted?
-    status == "deleted"
-  end
-
-  def is_pending?
-    status == "pending"
-  end
-
-  def is_active?
-    status == "active"
+  %w[retired deleted pending active].each do |s|
+    define_method :"is_#{s}?" do
+      status == s
+    end
   end
 
   def is_errored?
     status =~ /\Aerror:/
   end
 
+  # TODO: Redirect to CanCanCan ability
+  def can_manage_aiburs(user)
+    user.is_admin? || user.is_bureaucrat?
+  end
+
+  # * Pending
+  # * User is an admin
+  # * Either isn't aliasing to/from DNP or is a BD staff member
   def approvable_by?(user)
-    is_pending? && user.is_admin? && (user.is_bd_staff? || !(consequent_tag&.artist&.is_dnp? || antecedent_tag&.artist&.is_dnp?))
+    is_pending? && can_manage_aiburs(user) && (user.is_bd_staff? || !(consequent_tag&.artist&.is_dnp? || antecedent_tag&.artist&.is_dnp?))
   end
 
+  # A scope that returns the entries approvable by the given user; i.e:
+  # * Pending
+  # * User is an admin/bureaucrat
+  # * Either isn't aliasing to/from DNP or is a BD staff member
+  # NOTE: Needs to return a relation of none or return the default scope.
+  scope :approvable_by, ->(user) {
+    if can_manage_aiburs(user)
+      (user.is_bd_staff? ? pending : pending.left_joins(consequent_tag: { artist: :avoid_posting }, antecedent_tag: { artist: :avoid_posting }).and(no_dnp_artist))
+    else
+      TagRelationship.none
+    end
+  }
+
+  # Either an admin deleting a non-deleted relationship OR the creator deleting a pending relationship.
   def deletable_by?(user)
-    (user.is_admin? && !is_deleted?) || (is_pending? && creator.id == user.id)
+    (can_manage_aiburs(user) && !is_deleted?) || (is_pending? && creator.id == user.id)
   end
 
+  # A scope that returns the entries deletable by the given user (i.e. for admins/bureaucrats, all pending, otherwise none).
+  # NOTE: Needs to return a relation of none or return the default scope.
+  scope :deletable_by, ->(user) { can_manage_aiburs(user) ? where.not(status: "deleted") : where(creator_id: user.id, status: "pending") }
+
+  # All of the entries editable by the given user (i.e. for admins/bureaucrats, all pending, otherwise none).
+  # TODO: Should the creator be able to change this?
   def editable_by?(user)
-    is_pending? && user.is_admin?
+    is_pending? && can_manage_aiburs(user)
   end
+
+  # A scope that returns the entries editable by the given user (i.e. for admins/bureaucrats, all pending, otherwise none).
+  # NOTE: Needs to return a relation of none or return the default scope.
+  scope :editable_by, ->(user) { can_manage_aiburs(user) ? pending : TagRelationship.none }
 
   module SearchMethods
     def name_matches(name)
@@ -119,6 +150,11 @@ class TagRelationship < ApplicationRecord
 
     def join_consequent
       joins("LEFT OUTER JOIN tags consequent_tag on consequent_tag.name = consequent_name")
+    end
+
+    def left_joins_avoid_postings_artist(relation = nil)
+      # relation&.left_joins(consequent_tag: { artist: :avoid_posting }, antecedent_tag: { artist: :avoid_posting }) || left_joins(consequent_tag: { artist: :avoid_posting }, antecedent_tag: { artist: :avoid_posting })
+      (relation || self).left_joins(consequent_tag: { artist: :avoid_posting }, antecedent_tag: { artist: :avoid_posting })
     end
 
     def default_order
