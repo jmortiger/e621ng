@@ -70,3 +70,5 @@ group :test do
   gem "mocha", require: false
   gem "webmock", require: false
 end
+
+gem "cancancan", "~> 3.6"
