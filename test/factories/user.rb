@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 FactoryBot.define do
-  factory(:user, aliases: [:creator, :updater]) do
+  factory(:user, aliases: %i[creator updater]) do
     sequence :name do |n|
       "user#{n}"
     end
@@ -25,6 +25,11 @@ FactoryBot.define do
 
     factory(:privileged_user) do
       level { 30 }
+    end
+
+    # TODO: Update when actually implementing bureaucrat
+    factory(:bureaucrat_user) do
+      name { User::BUREAUCRAT_NAME }
     end
 
     factory(:janitor_user) do

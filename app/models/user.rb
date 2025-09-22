@@ -333,6 +333,12 @@ class User < ApplicationRecord
       end
     end
 
+    # HACK: To postpone adding the role
+    BUREAUCRAT_NAME = "The_Bureaucrat"
+    def is_bureaucrat?
+      self.name == BUREAUCRAT_NAME
+    end
+
     def is_bd_staff?
       is_bd_staff
     end
