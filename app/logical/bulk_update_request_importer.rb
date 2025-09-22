@@ -50,7 +50,7 @@ class BulkUpdateRequestImporter
         # do nothing
 
       else
-        raise Error, "Unparseable line: #{line}"
+        raise Error, "Unparsable line: #{line}"
       end
     end
   end
@@ -80,7 +80,7 @@ class BulkUpdateRequestImporter
         comment = "# missing" if token[3] == false
         "nuke tag #{token[1]} #{comment}".strip
       else
-        raise Error.new("Unknown token to reverse")
+        raise Error, "Unknown token to reverse"
       end
     end
   end
@@ -93,12 +93,12 @@ class BulkUpdateRequestImporter
     return [nil, "duplicate of alias ##{tag_alias.id}"] unless tag_alias.nil?
     tag_alias = TagAlias.new(forum_topic_id: forum_id, status: "pending", antecedent_name: token[1], consequent_name: token[2])
     unless tag_alias.valid?
-      return ["Error: #{tag_alias.errors.full_messages.join("; ")} (create alias #{tag_alias.antecedent_name} -> #{tag_alias.consequent_name})", nil]
+      return ["Error: #{tag_alias.errors.full_messages.join('; ')} (create alias #{tag_alias.antecedent_name} -> #{tag_alias.consequent_name})", nil]
     end
     if tag_alias.has_transitives
       return [nil, "has blocking transitive relationships, cannot be applied through BUR"]
     end
-    return [nil, nil]
+    [nil, nil]
   end
 
   def validate_implication(token)
@@ -106,9 +106,9 @@ class BulkUpdateRequestImporter
     return [nil, "duplicate of implication ##{tag_implication.id}"] unless tag_implication.nil?
     tag_implication = TagImplication.new(forum_topic_id: forum_id, status: "pending", antecedent_name: token[1], consequent_name: token[2])
     unless tag_implication.valid?
-      return ["Error: #{tag_implication.errors.full_messages.join("; ")} (create implication #{tag_implication.antecedent_name} -> #{tag_implication.consequent_name})", nil]
+      return ["Error: #{tag_implication.errors.full_messages.join('; ')} (create implication #{tag_implication.antecedent_name} -> #{tag_implication.consequent_name})", nil]
     end
-    return [nil, nil]
+    [nil, nil]
   end
 
   def validate_annotate(tokens, user)
@@ -119,37 +119,32 @@ class BulkUpdateRequestImporter
         output = validate_alias(token)
         errors << output[0] if output[0].present?
         token[3] = output[1]
-        token
 
       when :create_implication
         output = validate_implication(token)
         errors << output[0] if output[0].present?
         token[3] = output[1]
-        token
 
       when :remove_alias
         existing = TagAlias.duplicate_relevant.find_by(antecedent_name: token[1], consequent_name: token[2]).present?
         token[3] = existing
-        token
 
       when :remove_implication
         existing = TagImplication.duplicate_relevant.find_by(antecedent_name: token[1], consequent_name: token[2]).present?
         token[3] = existing
-        token
 
       when :mass_update, :change_category
         existing = Tag.find_by(name: token[1]).present?
         token[3] = existing
-        token
 
       when :nuke_tag
         errors << "Only admins can nuke tags" unless user.is_admin?
         existing = Tag.find_by(name: token[1]).present?
         token[3] = existing
-        token
-      else
-        errors << "Unknown token: #{token[0]}"
+
+      else next errors << "Unknown token: #{token[0]}"
       end
+      token
     end
     errors << "Cannot create BUR with more than 25 entries" if tokens.size > 25 && !user.is_admin?
     [errors, BulkUpdateRequestImporter.untokenize(annotated).join("\n")]
@@ -181,12 +176,12 @@ class BulkUpdateRequestImporter
   def find_create_alias(token, approver)
     tag_alias = TagAlias.duplicate_relevant.find_by(antecedent_name: token[1], consequent_name: token[2])
     if tag_alias.present?
-      return unless tag_alias.status == 'pending'
+      return unless tag_alias.status == "pending"
       tag_alias.update_columns(creator_id: creator_id, creator_ip_addr: creator_ip_addr, forum_topic_id: forum_id)
     else
-      tag_alias = TagAlias.create(:forum_topic_id => forum_id, :status => "pending", :antecedent_name => token[1], :consequent_name => token[2])
+      tag_alias = TagAlias.create(forum_topic_id: forum_id, status: "pending", antecedent_name: token[1], consequent_name: token[2])
       unless tag_alias.valid?
-        raise Error, "Error: #{tag_alias.errors.full_messages.join("; ")} (create alias #{tag_alias.antecedent_name} -> #{tag_alias.consequent_name})"
+        raise Error, "Error: #{tag_alias.errors.full_messages.join('; ')} (create alias #{tag_alias.antecedent_name} -> #{tag_alias.consequent_name})"
       end
     end
 
@@ -198,12 +193,12 @@ class BulkUpdateRequestImporter
   def find_create_implication(token, approver)
     tag_implication = TagImplication.duplicate_relevant.find_by(antecedent_name: token[1], consequent_name: token[2])
     if tag_implication.present?
-      return unless tag_implication.status == 'pending'
+      return unless tag_implication.status == "pending"
       tag_implication.update_columns(creator_id: creator_id, creator_ip_addr: creator_ip_addr, forum_topic_id: forum_id)
     else
-      tag_implication = TagImplication.create(:forum_topic_id => forum_id, :status => "pending", :antecedent_name => token[1], :consequent_name => token[2])
+      tag_implication = TagImplication.create(forum_topic_id: forum_id, status: "pending", antecedent_name: token[1], consequent_name: token[2])
       unless tag_implication.valid?
-        raise Error, "Error: #{tag_implication.errors.full_messages.join("; ")} (create implication #{tag_implication.antecedent_name} -> #{tag_implication.consequent_name})"
+        raise Error, "Error: #{tag_implication.errors.full_messages.join('; ')} (create implication #{tag_implication.antecedent_name} -> #{tag_implication.consequent_name})"
       end
     end
 

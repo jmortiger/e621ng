@@ -105,14 +105,14 @@ class TagImplication < TagRelationship
 
     def antecedent_is_not_aliased
       # We don't want to implicate a -> b if a is already aliased to c
-      if TagAlias.active.exists?(["antecedent_name = ?", antecedent_name])
+      if TagAlias.active.exists?(["antecedent_name = ?", antecedent_name]) # NOTE: Is contradicting the cop more efficient?
         errors.add(:base, "Antecedent tag must not be aliased to another tag")
       end
     end
 
     def consequent_is_not_aliased
       # We don't want to implicate a -> b if b is already aliased to c
-      if TagAlias.active.exists?(["antecedent_name = ?", consequent_name])
+      if TagAlias.active.exists?(["antecedent_name = ?", consequent_name]) # NOTE: Is contradicting the cop more efficient?
         errors.add(:base, "Consequent tag must not be aliased to another tag")
       end
     end
@@ -172,7 +172,7 @@ class TagImplication < TagRelationship
         page = 1
         loop do
           posts = PostSets::Post.new("#{antecedent_name} -#{consequent_name} status:any", page, limit: POST_LIMIT).posts
-          post_info = Hash.new
+          post_info = {}
           posts.each do |post|
             post_info[post.id] = post.tag_string
           end
@@ -200,18 +200,19 @@ class TagImplication < TagRelationship
     end
 
     def create_mod_action
-      implication = %Q("tag implication ##{id}":[#{Rails.application.routes.url_helpers.tag_implication_path(self)}]: [[#{antecedent_name}]] -> [[#{consequent_name}]])
+      implication = %("tag implication ##{id}":[#{Rails.application.routes.url_helpers.tag_implication_path(self)}]: [[#{antecedent_name}]] -> [[#{consequent_name}]])
 
       if previously_new_record?
-        ModAction.log(:tag_implication_create, {implication_id: id, implication_desc: implication})
+        ModAction.log(:tag_implication_create, { implication_id: id, implication_desc: implication })
       else
         # format the changes hash more nicely.
         change_desc = saved_changes.except(:updated_at).map do |attribute, values|
-          old, new = values[0], values[1]
+          old = values[0]
+          new = values[1]
           if old.nil?
-            %Q(set #{attribute} to "#{new}")
+            %(set #{attribute} to "#{new}")
           else
-            %Q(changed #{attribute} from "#{old}" to "#{new}")
+            %(changed #{attribute} from "#{old}" to "#{new}")
           end
         end.join(", ")
 
@@ -221,15 +222,13 @@ class TagImplication < TagRelationship
 
     def forum_updater
       post = if forum_topic
-        forum_post || forum_topic.posts.where("body like ?", TagImplicationRequest.command_string(antecedent_name, consequent_name, id) + "%").last
-      else
-        nil
-      end
+               forum_post || forum_topic.posts.where("body like ?", "#{TagImplicationRequest.command_string(antecedent_name, consequent_name, id)}%").last
+             end
       ForumUpdater.new(
         forum_topic,
         forum_post: post,
         expected_title: TagImplicationRequest.topic_title(antecedent_name, consequent_name),
-        skip_update: !TagRelationship::SUPPORT_HARD_CODED
+        skip_update: !TagRelationship::SUPPORT_HARD_CODED,
       )
     end
 
@@ -261,8 +260,8 @@ class TagImplication < TagRelationship
         end
 
         # TODO: Race condition with indexing jobs here.
-        antecedent_tag.fix_post_count if antecedent_tag
-        consequent_tag.fix_post_count if consequent_tag
+        antecedent_tag&.fix_post_count
+        consequent_tag&.fix_post_count
       end
     end
   end
@@ -286,6 +285,7 @@ class TagImplication < TagRelationship
   end
 
   def flush_cache
+    # TODO: Misspelled; is this used anywhere?
     @dedescendants = nil
     @parents = nil
   end

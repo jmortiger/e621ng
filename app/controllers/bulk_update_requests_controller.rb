@@ -7,14 +7,9 @@ class BulkUpdateRequestsController < ApplicationController
   before_action :load_bulk_update_request, except: %i[new create index]
   before_action :ensure_lockdown_disabled, except: %i[index show]
 
-  def new
-    @bulk_update_request = BulkUpdateRequest.new
-    respond_with(@bulk_update_request)
-  end
-
-  def create
-    @bulk_update_request = BulkUpdateRequest.create(bur_params(:create))
-    respond_with(@bulk_update_request)
+  def index
+    @bulk_update_requests = BulkUpdateRequest.search(search_params).includes(:forum_post, :user, :approver).paginate(params[:page], limit: params[:limit])
+    respond_with(@bulk_update_requests)
   end
 
   def show
@@ -22,7 +17,17 @@ class BulkUpdateRequestsController < ApplicationController
     respond_with(@bulk_update_request)
   end
 
+  def new
+    @bulk_update_request = BulkUpdateRequest.new
+    respond_with(@bulk_update_request)
+  end
+
   def edit
+  end
+
+  def create
+    @bulk_update_request = BulkUpdateRequest.create(bur_params(:create))
+    respond_with(@bulk_update_request)
   end
 
   def update
@@ -36,16 +41,6 @@ class BulkUpdateRequestsController < ApplicationController
     end
   end
 
-  def approve
-    @bulk_update_request.approve!(CurrentUser.user)
-    if @bulk_update_request.errors.size > 0
-      flash[:notice] = @bulk_update_request.errors.full_messages.join(";")
-    else
-      flash[:notice] = "Bulk update approved"
-    end
-    respond_with(@bulk_update_request)
-  end
-
   def destroy
     if @bulk_update_request.rejectable?(CurrentUser.user)
       @bulk_update_request.reject!(CurrentUser.user)
@@ -56,9 +51,14 @@ class BulkUpdateRequestsController < ApplicationController
     end
   end
 
-  def index
-    @bulk_update_requests = BulkUpdateRequest.search(search_params).includes(:forum_post, :user, :approver).paginate(params[:page], limit: params[:limit])
-    respond_with(@bulk_update_requests)
+  def approve
+    @bulk_update_request.approve!(CurrentUser.user)
+    if @bulk_update_request.errors.size > 0
+      flash[:notice] = @bulk_update_request.errors.full_messages.join(";")
+    else
+      flash[:notice] = "Bulk update approved"
+    end
+    respond_with(@bulk_update_request)
   end
 
   private

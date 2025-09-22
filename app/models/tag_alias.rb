@@ -17,6 +17,7 @@ class TagAlias < TagRelationship
 
     def undo!(approver: CurrentUser.user)
       CurrentUser.scoped(approver) do
+        # TODO: Misspelled; is this used anywhere?
         TagAliaseUndoJob.perform_later(id, true)
       end
     end
@@ -26,15 +27,13 @@ class TagAlias < TagRelationship
     def forum_updater
       @forum_updater ||= begin
         post = if forum_topic
-                 forum_post || forum_topic.posts.where("body like ?", TagAliasRequest.command_string(antecedent_name, consequent_name, id) + "%").last
-               else
-                 nil
+                 forum_post || forum_topic.posts.where("body like ?", "#{TagAliasRequest.command_string(antecedent_name, consequent_name, id)}%").last
                end
         ForumUpdater.new(
-            forum_topic,
-            forum_post: post,
-            expected_title: TagAliasRequest.topic_title(antecedent_name, consequent_name),
-            skip_update: !TagRelationship::SUPPORT_HARD_CODED
+          forum_topic,
+          forum_post: post,
+          expected_title: TagAliasRequest.topic_title(antecedent_name, consequent_name),
+          skip_update: !TagRelationship::SUPPORT_HARD_CODED,
         )
       end
     end
@@ -62,7 +61,7 @@ class TagAlias < TagRelationship
     end
 
     def has_transitives
-      @has_transitives ||= list_transitives.size > 0
+      @has_transitives ||= !list_transitives.empty?
     end
   end
 
@@ -81,8 +80,8 @@ class TagAlias < TagRelationship
   def self.to_aliased_with_originals(names)
     names = Array(names).map(&:to_s)
     return {} if names.empty?
-    aliases = active.where(antecedent_name: names).map { |ta| [ta.antecedent_name, ta.consequent_name] }.to_h
-    names.map { |tag| [tag, tag] }.to_h.merge(aliases)
+    aliases = active.where(antecedent_name: names).to_h { |ta| [ta.antecedent_name, ta.consequent_name] }
+    names.to_h { |tag| [tag, tag] }.merge(aliases)
   end
 
   def self.to_aliased(names)
@@ -195,16 +194,14 @@ class TagAlias < TagRelationship
       end
 
       # TODO: Race condition with indexing jobs here.
-      antecedent_tag.fix_post_count if antecedent_tag
-      consequent_tag.fix_post_count if consequent_tag
+      antecedent_tag&.fix_post_count
+      consequent_tag&.fix_post_count
     end
   end
 
   def rename_artist_undo
-    if consequent_tag.category == Tag.categories.artist
-      if consequent_tag.artist.present? && antecedent_tag.artist.blank?
-        consequent_tag.artist.update!(name: antecedent_name)
-      end
+    if consequent_tag.category == Tag.categories.artist && consequent_tag.artist.present? && antecedent_tag.artist.blank?
+      consequent_tag.artist.update!(name: antecedent_name)
     end
   end
 
@@ -222,16 +219,16 @@ class TagAlias < TagRelationship
         update_posts
         rename_artist
         forum_updater.update(approval_message(approver), "APPROVED") if update_topic
-        update(status: 'active', post_count: consequent_tag.post_count)
+        update(status: "active", post_count: consequent_tag.post_count)
         # TODO: Race condition with indexing jobs here.
-        antecedent_tag.fix_post_count if antecedent_tag
-        consequent_tag.fix_post_count if consequent_tag
+        antecedent_tag&.fix_post_count
+        consequent_tag&.fix_post_count
       end
     rescue Exception => e
       Rails.logger.error("[TA] #{e.message}\n#{e.backtrace}")
       if tries < 5 && !Rails.env.test?
         tries += 1
-        sleep 2 ** tries
+        sleep 2**tries
         retry
       end
 
@@ -245,17 +242,15 @@ class TagAlias < TagRelationship
   def absence_of_transitive_relation
     # We don't want a -> b && b -> c chains if the b -> c alias was created first.
     # If the a -> b alias was created first, the new one will be allowed and the old one will be moved automatically instead.
-    if TagAlias.active.exists?(antecedent_name: consequent_name)
+    if TagAlias.active.exists?(antecedent_name: consequent_name) # NOTE: Is contradicting the cop more efficient?
       errors.add(:base, "A tag alias for #{consequent_name} already exists")
     end
-
-
   end
 
   def move_aliases_and_implications
     aliases = TagAlias.where(["consequent_name = ?", antecedent_name])
     aliases.each do |ta|
-      ta.consequent_name = self.consequent_name
+      ta.consequent_name = consequent_name
       success = ta.save
       if !success && ta.errors.full_messages.join("; ") =~ /Cannot alias a tag to itself/
         ta.destroy
@@ -264,7 +259,7 @@ class TagAlias < TagRelationship
 
     implications = TagImplication.where(["antecedent_name = ?", antecedent_name])
     implications.each do |ti|
-      ti.antecedent_name = self.consequent_name
+      ti.antecedent_name = consequent_name
       success = ti.save
       if !success && ti.errors.full_messages.join("; ") =~ /Cannot implicate a tag to itself/
         ti.destroy
@@ -273,7 +268,7 @@ class TagAlias < TagRelationship
 
     implications = TagImplication.where(["consequent_name = ?", antecedent_name])
     implications.each do |ti|
-      ti.consequent_name = self.consequent_name
+      ti.consequent_name = consequent_name
       success = ti.save
       if !success && ti.errors.full_messages.join("; ") =~ /Cannot implicate a tag to itself/
         ti.destroy
@@ -344,18 +339,19 @@ class TagAlias < TagRelationship
   end
 
   def create_mod_action
-    alias_desc = %Q("tag alias ##{id}":[#{Rails.application.routes.url_helpers.tag_alias_path(self)}]: [[#{antecedent_name}]] -> [[#{consequent_name}]])
+    alias_desc = %("tag alias ##{id}":[#{Rails.application.routes.url_helpers.tag_alias_path(self)}]: [[#{antecedent_name}]] -> [[#{consequent_name}]])
 
     if previously_new_record?
-      ModAction.log(:tag_alias_create, {alias_id: id, alias_desc: alias_desc})
+      ModAction.log(:tag_alias_create, { alias_id: id, alias_desc: alias_desc })
     else
       # format the changes hash more nicely.
       change_desc = saved_changes.except(:updated_at).map do |attribute, values|
-        old, new = values[0], values[1]
+        old = values[0]
+        new = values[1]
         if old.nil?
-          %Q(set #{attribute} to "#{new}")
+          %(set #{attribute} to "#{new}")
         else
-          %Q(changed #{attribute} from "#{old}" to "#{new}")
+          %(changed #{attribute} from "#{old}" to "#{new}")
         end
       end.join(", ")
 
