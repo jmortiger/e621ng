@@ -333,10 +333,18 @@ class User < ApplicationRecord
       end
     end
 
+    attr_accessor :implication_ability
+
+    def init_ability
+      @implication_ability = TagImplicationAbility.new(self)
+    end
+
+    delegate :can?, :cannot?, to: :implication_ability
+
     # HACK: To postpone adding the role
     BUREAUCRAT_NAME = "The_Bureaucrat"
     def is_bureaucrat?
-      self.name == BUREAUCRAT_NAME
+      name == BUREAUCRAT_NAME
     end
 
     def is_bd_staff?

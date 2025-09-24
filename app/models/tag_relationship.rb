@@ -74,7 +74,14 @@ class TagRelationship < ApplicationRecord
   end
 
   # TODO: Redirect to CanCanCan ability
-  def can_manage_aiburs(user)
+  # TODO: Move to User
+  def self.can_manage_aiburs?(user)
+    user.is_admin? || user.is_bureaucrat?
+  end
+
+  # TODO: Redirect to CanCanCan ability
+  # TODO: Move to User
+  def can_manage_aiburs?(user)
     user.is_admin? || user.is_bureaucrat?
   end
 
@@ -82,7 +89,7 @@ class TagRelationship < ApplicationRecord
   # * User is an admin
   # * Either isn't aliasing to/from DNP or is a BD staff member
   def approvable_by?(user)
-    is_pending? && can_manage_aiburs(user) && (user.is_bd_staff? || !(consequent_tag&.artist&.is_dnp? || antecedent_tag&.artist&.is_dnp?))
+    is_pending? && can_manage_aiburs?(user) && (user.is_bd_staff? || !(consequent_tag&.artist&.is_dnp? || antecedent_tag&.artist&.is_dnp?))
   end
 
   # A scope that returns the entries approvable by the given user; i.e:
@@ -91,8 +98,15 @@ class TagRelationship < ApplicationRecord
   # * Either isn't aliasing to/from DNP or is a BD staff member
   # NOTE: Needs to return a relation of none or return the default scope.
   scope :approvable_by, ->(user) {
-    if can_manage_aiburs(user)
-      (user.is_bd_staff? ? pending : pending.left_joins(consequent_tag: { artist: :avoid_posting }, antecedent_tag: { artist: :avoid_posting }).and(no_dnp_artist))
+    if can_manage_aiburs?(user)
+      if user.is_bd_staff?
+        pending
+      else
+        pending.left_joins(
+          consequent_tag: { artist: :avoid_posting },
+          antecedent_tag: { artist: :avoid_posting },
+        ).and(no_dnp_artist)
+      end
     else
       TagRelationship.none
     end
@@ -100,22 +114,27 @@ class TagRelationship < ApplicationRecord
 
   # Either an admin deleting a non-deleted relationship OR the creator deleting a pending relationship.
   def deletable_by?(user)
-    (can_manage_aiburs(user) && !is_deleted?) || (is_pending? && creator.id == user.id)
+    (can_manage_aiburs?(user) && !is_deleted?) || (is_pending? && creator.id == user.id)
   end
 
   # A scope that returns the entries deletable by the given user (i.e. for admins/bureaucrats, all pending, otherwise none).
   # NOTE: Needs to return a relation of none or return the default scope.
-  scope :deletable_by, ->(user) { can_manage_aiburs(user) ? where.not(status: "deleted") : where(creator_id: user.id, status: "pending") }
+  scope :deletable_by, ->(user) { can_manage_aiburs?(user) ? where.not(status: "deleted") : where(creator_id: user.id, status: "pending") }
+
+  alias rejectable_by? deletable_by?
+
+  # alias rejectable_by deletable_by
+  scope :rejectable_by, ->(user) { deletable_by(user) }
 
   # All of the entries editable by the given user (i.e. for admins/bureaucrats, all pending, otherwise none).
   # TODO: Should the creator be able to change this?
   def editable_by?(user)
-    is_pending? && can_manage_aiburs(user)
+    is_pending? && can_manage_aiburs?(user)
   end
 
   # A scope that returns the entries editable by the given user (i.e. for admins/bureaucrats, all pending, otherwise none).
   # NOTE: Needs to return a relation of none or return the default scope.
-  scope :editable_by, ->(user) { can_manage_aiburs(user) ? pending : TagRelationship.none }
+  scope :editable_by, ->(user) { can_manage_aiburs?(user) ? pending : TagRelationship.none }
 
   module SearchMethods
     def name_matches(name)

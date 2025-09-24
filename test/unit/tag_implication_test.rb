@@ -5,6 +5,7 @@ require "test_helper"
 class TagImplicationTest < ActiveSupport::TestCase
   context "A tag implication" do
     setup do
+      @mod = create(:moderator_user)
       @bureaucrat = create(:bureaucrat_user)
       @admin = create(:admin_user)
       CurrentUser.user = @admin
@@ -60,7 +61,6 @@ class TagImplicationTest < ActiveSupport::TestCase
 
     context "#approvable_by?" do
       setup do
-        @mod = create(:moderator_user)
         @bd = create(:bd_staff_user)
         @ti = as(@user) { create(:tag_implication, status: "pending") }
         @dnp = as(@bd) { create(:avoid_posting) }
@@ -113,10 +113,10 @@ class TagImplicationTest < ActiveSupport::TestCase
     context "#deletable_by?" do
       setup do
         @other_user = create(:user)
-        @ti_p = as(@user) { create(:tag_implication, status: "pending") }
-        @ti_a = as(@user) { create(:tag_implication, status: "active") }
-        @ti_o = as(@other_user) { create(:tag_implication, status: "pending") }
-        @ti_d = as(@user) { create(:tag_implication, status: "deleted") }
+        @ti_p = as(@user) { create(:tag_implication, antecedent_name: "ti_a0", consequent_name: "ti_c0", status: "pending") }
+        @ti_a = as(@user) { create(:tag_implication, antecedent_name: "ti_a1", consequent_name: "ti_c1", status: "active") }
+        @ti_o = as(@other_user) { create(:tag_implication, antecedent_name: "ti_a2", consequent_name: "ti_c2", status: "pending") }
+        @ti_d = as(@user) { create(:tag_implication, antecedent_name: "ti_a3", consequent_name: "ti_c3", status: "deleted") }
       end
 
       should "allow creator while pending" do
@@ -159,10 +159,10 @@ class TagImplicationTest < ActiveSupport::TestCase
     context "#editable_by?" do
       setup do
         @other_user = create(:user)
-        @ti_p = as(@user) { create(:tag_implication, status: "pending") }
-        @ti_a = as(@user) { create(:tag_implication, status: "active") }
-        @ti_o = as(@other_user) { create(:tag_implication, status: "pending") }
-        @ti_d = as(@user) { create(:tag_implication, status: "deleted") }
+        @ti_p = as(@user) { create(:tag_implication, antecedent_name: "ti_a0", consequent_name: "ti_c0", status: "pending") }
+        @ti_a = as(@user) { create(:tag_implication, antecedent_name: "ti_a1", consequent_name: "ti_c1", status: "active") }
+        @ti_o = as(@other_user) { create(:tag_implication, antecedent_name: "ti_a2", consequent_name: "ti_c2", status: "pending") }
+        @ti_d = as(@user) { create(:tag_implication, antecedent_name: "ti_a3", consequent_name: "ti_c3", status: "deleted") }
       end
 
       should "not allow creator" do
