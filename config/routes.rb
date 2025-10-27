@@ -395,6 +395,8 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :resource_abilities
+
   options "*all", to: "application#enable_cors"
 
   # aliases

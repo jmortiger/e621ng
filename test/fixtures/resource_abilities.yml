@@ -1,0 +1,9 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  active_permissions: 
+  active_restrictions: 
+
+two:
+  active_permissions: 
+  active_restrictions: 
