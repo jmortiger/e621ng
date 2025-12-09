@@ -23,7 +23,7 @@ class Takedown < ApplicationRecord
   def initialize_fields
     self.status = "pending"
     self.vericode = Takedown.create_vericode
-    self.del_post_ids = ''
+    self.del_post_ids = ""
   end
 
   def strip_fields
@@ -49,7 +49,7 @@ class Takedown < ApplicationRecord
     def valid_posts_or_instructions
       if post_array.size <= 0 && instructions.blank?
         errors.add(:base, "You must provide post ids or instructions.")
-        return false
+        false
       end
     end
 
@@ -75,7 +75,7 @@ class Takedown < ApplicationRecord
 
     def validate_number_of_posts
       if post_array.size > 5_000
-        self.errors.add(:base, "You can only have 5000 posts in a takedown.")
+        errors.add(:base, "You can only have 5000 posts in a takedown.")
         return false
       end
       true
@@ -96,8 +96,8 @@ class Takedown < ApplicationRecord
     def add_posts_by_ids!(ids)
       added_ids = []
       with_lock do
-        self.post_ids = (post_array + matching_post_ids(ids)).uniq.join(' ')
-        added_ids = self.post_array - self.post_array_was
+        self.post_ids = (post_array + matching_post_ids(ids)).uniq.join(" ")
+        added_ids = post_array - post_array_was
         save!
       end
       added_ids
@@ -110,7 +110,7 @@ class Takedown < ApplicationRecord
 
     def remove_posts_by_ids!(ids)
       with_lock do
-        self.post_ids = (post_array - matching_post_ids(ids)).uniq.join(' ')
+        self.post_ids = (post_array - matching_post_ids(ids)).uniq.join(" ")
         save!
       end
     end
@@ -126,19 +126,19 @@ class Takedown < ApplicationRecord
     end
 
     def normalize_post_ids
-      self.post_ids = matching_post_ids(post_ids).join(' ')
+      self.post_ids = matching_post_ids(post_ids).join(" ")
     end
 
     def normalize_deleted_post_ids
       posts = matching_post_ids(post_ids)
       del_posts = matching_post_ids(del_post_ids)
       del_posts = del_posts & posts # ensure that all deleted posts are also posts
-      self.del_post_ids = del_posts.join(' ')
+      self.del_post_ids = del_posts.join(" ")
     end
 
     def validate_post_ids
-      temp_post_ids = Post.select(:id).where(id: post_array).map {|x| x.id.to_s}
-      self.post_ids = temp_post_ids.join(' ')
+      temp_post_ids = Post.select(:id).where(id: post_array).map { |x| x.id.to_s }
+      self.post_ids = temp_post_ids.join(" ")
     end
 
     def del_post_array
@@ -187,7 +187,7 @@ class Takedown < ApplicationRecord
       to_del = []
       posts ||= []
       posts.each do |post_id, keep|
-        if keep == '1'
+        if keep == "1"
           to_del << post_id
         end
       end
@@ -212,7 +212,7 @@ class Takedown < ApplicationRecord
       end
       if params[:post_id].present?
         post_id = params[:post_id].to_i
-        q = q.where('post_ids ~ ?', "(^| )#{post_id}($| )")
+        q = q.where("post_ids ~ ?", "(^| )#{post_id}($| )")
       end
       if params[:instructions].present?
         q = q.where_ilike(:instructions, params[:instructions])
@@ -221,20 +221,20 @@ class Takedown < ApplicationRecord
         q = q.where_ilike(:notes, params[:notes])
       end
       if params[:reason_hidden].present?
-        q = q.where('reason_hidden = ?', params[:reason_hidden])
+        q = q.where("reason_hidden = ?", params[:reason_hidden])
       end
       if params[:ip_addr].present?
-        q = q.where('creator_ip_addr <<= ?', params[:ip_addr])
+        q = q.where("creator_ip_addr <<= ?", params[:ip_addr])
       end
       q = q.where_user(:creator_id, :creator, params)
       if params[:email].present?
         q = q.where_ilike(:email, params[:email])
       end
       if params[:vericode].present?
-        q = q.where('vericode = ?', params[:vericode])
+        q = q.where("vericode = ?", params[:vericode])
       end
       if params[:status].present?
-        q = q.where('status = ?', params[:status])
+        q = q.where("status = ?", params[:status])
       end
 
       if params[:creator_logged_in].to_s.truthy?
@@ -244,10 +244,10 @@ class Takedown < ApplicationRecord
       end
 
       case params[:order]
-      when 'status'
-        q = q.order('status ASC')
-      when 'post_count'
-        q = q.order('post_count DESC')
+      when "status"
+        q = q.order("status ASC")
+      when "post_count"
+        q = q.order("post_count DESC")
       else
         q = q.apply_basic_order(params)
       end
@@ -258,7 +258,7 @@ class Takedown < ApplicationRecord
 
   module StatusMethods
     def completed?
-      ["approved", "denied", "partial"].include?(status)
+      %w[approved denied partial].include?(status)
     end
 
     def calculated_status
@@ -277,7 +277,7 @@ class Takedown < ApplicationRecord
 
   module APIMethods
     def hidden_attributes
-      super + [:source, :vericode, :email, :reason, :instructions, :post_ids, :del_post_ids, :creator_id, :notes]
+      super + %i[source vericode email reason instructions post_ids del_post_ids creator_id notes]
     end
   end
 
