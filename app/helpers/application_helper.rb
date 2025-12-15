@@ -211,6 +211,90 @@ module ApplicationHelper
     end
   end
 
+  # TODO: Summary
+  # TODO: Test
+  # ### Parameters
+  # ### Returns
+  def to_roman_numeral(value)
+    ret = ""
+    carry = value % 1000
+    # Ensure integer precision is kept
+    value = ((value - carry) / 1000).to_i
+    while value > 0
+      ret += "M"
+      value -= 1
+    end
+    if carry >= 900
+      ret += "CM"
+      carry -= 900
+    end
+    value = carry
+    carry = value % 500
+    # Ensure integer precision is kept
+    value = ((value - carry) / 500).to_i
+    while value > 0
+      ret += "D"
+      value -= 1
+    end
+    if carry >= 400
+      ret += "CD"
+      carry -= 400
+    end
+    value = carry
+    carry = value % 100
+    # Ensure integer precision is kept
+    value = ((value - carry) / 100).to_i
+    while value > 0
+      ret += "C"
+      value -= 1
+    end
+    if carry >= 90
+      ret += "XC"
+      carry -= 90
+    end
+    value = carry
+    carry = value % 50
+    # Ensure integer precision is kept
+    value = ((value - carry) / 50).to_i
+    while value > 0
+      ret += "L"
+      value -= 1
+    end
+    if carry >= 40
+      ret += "XL"
+      carry -= 40
+    end
+    value = carry
+    carry = value % 10
+    # Ensure integer precision is kept
+    value = ((value - carry) / 10).to_i
+    while value > 0
+      ret += "X"
+      value -= 1
+    end
+    if carry >= 9
+      ret += "IX"
+      carry -= 9
+    end
+    value = carry
+    carry = value % 5
+    # Ensure integer precision is kept
+    value = ((value - carry) / 5).to_i
+    while value > 0
+      ret += "V"
+      value -= 1
+    end
+    if carry >= 4
+      ret += "IV"
+      carry -= 4
+    end
+    while carry > 0
+      ret += "I"
+      carry -= 1
+    end
+    ret
+  end
+
   protected
 
   def nav_link_match(controller, url)
