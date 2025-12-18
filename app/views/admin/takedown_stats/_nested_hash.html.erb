@@ -1,0 +1,62 @@
+<%# locals: (hash:, level: 1, hash_key:, count: 0) %>
+<%# `level` {Integer} %>
+<% level_legend = {
+  "1" => [*1..24].map { |e| to_roman_numeral(e) }.freeze,
+  "2" => [*"A".."Z"].freeze,
+  "3" => [*1..24].freeze,
+  "4" => [*1..24].map { |e| to_roman_numeral(e) }.map(&:downcase).freeze,
+  "5" => [*"A".."Z"].map(&:downcase).freeze,
+}.freeze %>
+<% count = 0 if count.nil? || count > 23 %>
+<% level = level.to_i %>
+<% level = 1 if level < 1 %>
+<% header_level = "h#{level <= 6 ? level : 6}" %>
+<<%= header_level %> class="takedown-hash-header st-collapsible-header" collapsed indicator=arrow><%= level_legend.fetch(level.to_s, level_legend["3"])[count] %>. <%= hash_key.to_s.titleize %></<%= header_level %>>
+<div style="padding-left:1rem;">
+  <% child_maps = {} %>
+  <% if hash.any? { |_k, v| !v.is_a?(Hash) } %>
+    <table class="striped">
+      <thead>
+        <tr>
+          <th style="width: 25%;">Key</th>
+          <th style="width: 75%;">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% hash.each_pair do |key, value| %>
+          <% if value.is_a?(Hash) %>
+            <% if value.key?(:user_id) && value.key?(:user_name) %>
+              <tr>
+                <th><%= key.to_s.titleize %></th>
+                <td><a href=<%= "/users/#{value[:user_id]}" %>><%= value[:user_name] %></a></td>
+              </tr>
+            <% else %>
+              <% child_maps[key] = value %>
+              <% next %>
+            <% end %>
+          <% else %>
+            <tr>
+              <th><%= key.to_s.titleize %></th>
+              <td>
+                <% if value.is_a?(Array) && value.all? { |e| e.is_a?(Hash) } %>
+                  <% value.each_with_index do |e, i| %>
+                    <%= render partial: "nested_hash", locals: { hash: e, hash_key: "", count: i } %>
+                  <% end %>
+                <% else %>
+                  <%= value.to_s %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+  <% child_maps = hash %>
+  <% end %>
+  <% l_count = 0 %>
+  <% child_maps.each_pair do |key, value| %>
+    <%= render partial: "nested_hash", locals: { hash: value, level: level + 1, hash_key: key, count: l_count } %>
+    <% l_count += 1 %>
+  <% end %>
+</div>

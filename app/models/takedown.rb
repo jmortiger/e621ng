@@ -51,6 +51,7 @@ class Takedown < ApplicationRecord
         errors.add(:base, "You must provide post ids or instructions.")
         false
       end
+      true
     end
 
     def can_create_takedown
@@ -256,9 +257,81 @@ class Takedown < ApplicationRecord
     end
   end
 
+  STATUSES = %w[approved denied partial inactive pending].freeze
+
+  # class_eval do
+  #   STATUSES.each do |string|
+  #     define_singleton_method string.to_sym, -> { where(status: string) }
+  #     define_method :"#{string}?", -> { status == string }
+  #   end
+  # end
+
+  # TODO: Why doesn't this work?
+  # scope :approved, -> { where(status: "approved") }
+  # scope :denied, -> { where(status: "denied") }
+  # scope :partial, -> { where(status: "partial") }
+  # scope :inactive, -> { where(status: "inactive") }
+  # scope :pending, -> { where(status: "pending") }
+  #
+  # scope :completed, -> { where(status: StatusMethods::COMPLETED_STATUSES) }
+
+  def self.approved
+    where(status: "approved")
+  end
+
+  def self.denied
+    where(status: "denied")
+  end
+
+  def self.partial
+    where(status: "partial")
+  end
+
+  def self.inactive
+    where(status: "inactive")
+  end
+
+  def self.pending
+    where(status: "pending")
+  end
+
+  def self.completed
+    where(status: COMPLETED_STATUSES)
+  end
+
+  def self.incompleted
+    where.not(status: COMPLETED_STATUSES)
+  end
+
   module StatusMethods
+    def approved?
+      status == "approved"
+    end
+
+    def denied?
+      status == "denied"
+    end
+
+    def partial?
+      status == "partial"
+    end
+
+    def inactive?
+      status == "inactive"
+    end
+
+    def pending?
+      status == "pending"
+    end
+
+    COMPLETED_STATUSES = %w[approved denied partial].freeze
+
     def completed?
-      %w[approved denied partial].include?(status)
+      COMPLETED_STATUSES.include?(status)
+    end
+
+    def incompleted?
+      !completed?
     end
 
     def calculated_status
@@ -273,6 +346,30 @@ class Takedown < ApplicationRecord
         "partial"
       end
     end
+  end
+
+  def has_user?
+    !creator_id.nil?
+  end
+
+  def self.has_user
+    where.not(creator_id: nil)
+  end
+
+  def has_verified_user?
+    has_user? && Artist.where(linked_user_id: creator_id)
+  end
+
+  def self.has_verified_user?
+    joins("INNER JOIN #{User.table_name} ON #{User.table_name}.id = #{Takedown.table_name}.creator_id INNER JOIN #{Artist.table_name} ON #{Artist.table_name}.linked_user_id = #{User.table_name}.id")
+  end
+
+  def has_approver?
+    !approver_id.nil?
+  end
+
+  def self.has_approver
+    where.not(approver_id: nil)
   end
 
   module APIMethods

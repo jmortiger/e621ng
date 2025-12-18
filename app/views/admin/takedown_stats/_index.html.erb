@@ -1,0 +1,12 @@
+<div id="c-stats">
+  <div id="a-index">
+    <p>Refreshed once a day.</p>
+    <p style="display:none"><%= @stats.to_s %></p>
+    <p style="display:none"><%= @stats.to_json %></p>
+    <%= render "nested_hash", hash: @stats, hash_key: :takedown_stats %>
+  </div>
+</div>
+
+<% content_for(:page_title) do %>
+  Takedown Stats
+<% end %>
