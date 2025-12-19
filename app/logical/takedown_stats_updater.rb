@@ -349,10 +349,16 @@ class TakedownStatsUpdater
                                             when 2
                                               kwargs[:path].map { |e| d_gen.call(e) }.join(" and ")
                                             else
-                                              "#{kwargs[:path]
-                                                .first(kwargs[:path].length - 1)
-                                                .map { |e| d_gen.call(e) }
-                                                .join(', ')} and #{d_gen.call(kwargs[:path].last)}"
+                                              "#{
+                                                kwargs[:path]
+                                                  .first(kwargs[:path].length - 1)
+                                                  .map { |e| d_gen.call(e) }
+                                                  .join(', ')
+                                              }, and #{
+                                                d_gen
+                                                  .call(kwargs[:path]
+                                                  .last)
+                                              }"
                                             end
       info[:metrics][:group_description] += "."
     end
@@ -360,18 +366,33 @@ class TakedownStatsUpdater
     return info unless recursive_items.is_a?(Hash)
     recursive_items.each_pair do |k, v|
       if USER_SYMBOLS.include?(k) && v.is_a?(Hash) && v[:use_user_ids]
-        (info[:metrics][:user_frequency][k.to_s[4..].to_sym] ||= {})
+        sym = k.to_s[4..].to_sym
+        (info[:metrics][:user_frequency][sym] ||= {})
           .merge!(
             (
               info.dig(:metrics, :user_frequency)&.keys ||
               array.pluck(&(k == :has_approver ? :approver_id : :creator_id)).uniq.compact
             ).index_with do |e|
+              t_array = array.select { |el| el.creator_id == e }
+              next nil if t_array.blank?
+              # user = t_array.first.send(sym.to_s.end_with?("user") ? :creator : :approver)
               yield_numeric_stats_from(
-                array.select { |el| el.creator_id == e },
-                is_completed: is_completed, #  || COMPLETED_STATUSES.include?(k),
+                t_array,
+                is_completed: is_completed,
                 **(v.is_a?(Hash) ? v : {}),
-                path: kwargs.fetch(:path, []) + [:user_frequency, k],
+                path: kwargs.fetch(:path, []) + [:user_frequency, sym],
               )
+              # .merge({
+              #   user_hash: {
+              #     level_css_class: user.level_css_class,
+              #     can_approve_posts?: user.can_approve_posts?,
+              #     can_upload_free?: user.can_upload_free?,
+              #     is_banned?: user.is_banned?,
+              #     pretty_name: user.pretty_name,
+              #     id: user.id,
+              #     is_verified?: user.is_verified?,
+              #   },
+              # })
             end,
           )
         next
@@ -410,6 +431,47 @@ class TakedownStatsUpdater
   #
   # Those hashes have the following keys:
   def self.gen_main_stats(takedowns)
+    # status_map = {
+    #   # #region Simplest
+    #   # completed: nil,
+    #   # incompleted: nil,
+    #   # approved: nil,
+    #   # denied: nil,
+    #   # partial: nil,
+    #   # inactive: nil,
+    #   # pending: nil,
+    #   # #endregion Simplest
+    #   # #region 2nd Simplest
+    #   # completed: {
+    #   #   items: DEFAULT_YIELD_ITEMS + COMPLETED_STATUSES - [:completed],
+    #   # },
+    #   # incompleted: {
+    #   #   items: DEFAULT_YIELD_ITEMS + ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted],
+    #   # },
+    #   # #endregion 2nd Simplest
+    #   # #region Most complex
+    #   completed: {
+    #     items: COMPLETED_STATUSES - [:completed] + DEFAULT_YIELD_ITEMS,
+    #     recursive_items: (COMPLETED_STATUSES - [:completed]).index_with { |_e| nil },
+    #   },
+    #   incompleted: {
+    #     items: ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted] + DEFAULT_YIELD_ITEMS,
+    #     recursive_items: (ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted]).index_with { |_e| nil },
+    #   },
+    #   # #endregion Most complex
+    # }
+    # user_frequency_map = {
+    #   has_user: {
+    #     use_user_ids: true,
+    #     items: ALL_STATUS_SYMBOLS + DEFAULT_YIELD_ITEMS - %i[user_frequency has_user has_verified_user],
+    #     recursive_items: status_map.deep_dup,
+    #   },
+    # }
+    # [status_map[:completed][:recursive_items], status_map[:incompleted][:recursive_items]].each do |h|
+    #   h.transform_values! do |_v|
+    #     { recursive_items: { has_user: { use_user_ids: true } }, items:  }
+    #   end
+    # end
     yield_numeric_stats_from(
       takedowns,
       items: ALL_STATUS_SYMBOLS + DEFAULT_YIELD_ITEMS,

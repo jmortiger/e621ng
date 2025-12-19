@@ -143,9 +143,22 @@ module ApplicationHelper
     link_to ip, moderator_ip_addrs_path(search: { ip_addr: ip })
   end
 
-  def link_to_user(user, include_activation: false)
+  def link_to_user_hash(user, include_activation: false, include_artist: false)
+    user_class = user[:level_css_class]
+    user_class += " user-post-approver" if user[:can_approve_posts?]
+    user_class += " user-post-uploader" if user[:can_upload_free?]
+    user_class += " user-banned" if user[:is_banned?]
+    user_class += " with-style" if CurrentUser.user.style_usernames?
+    html = link_to(user[:pretty_name], user_path(user[:id]), class: user_class, rel: "nofollow")
+    html << " (Unactivated)" if include_activation && !user[:is_verified?]
+    html << svg_icon(:chexagon, class: "chexagon", title: "Verified artist uploader") if include_artist && Artist.where(linked_user_id: user[:id]).exists?
+    html
+  end
+
+  def link_to_user(user, include_activation: false, include_artist: false)
     return "anonymous" if user.blank?
 
+    return link_to_user_hash(user, include_activation: :include_activation, include_artist: :include_artist) unless user.respond_to?(:level_css_class)
     user_class = user.level_css_class
     user_class += " user-post-approver" if user.can_approve_posts?
     user_class += " user-post-uploader" if user.can_upload_free?
@@ -153,6 +166,7 @@ module ApplicationHelper
     user_class += " with-style" if CurrentUser.user.style_usernames?
     html = link_to(user.pretty_name, user_path(user), class: user_class, rel: "nofollow")
     html << " (Unactivated)" if include_activation && !user.is_verified?
+    html << svg_icon(:chexagon, class: "chexagon", title: "Verified artist uploader") if include_artist && Artist.where(linked_user_id: user.id).exists?
     html
   end
 

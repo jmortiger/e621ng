@@ -28,7 +28,7 @@
             <% if value.key?(:user_id) && value.key?(:user_name) %>
               <tr>
                 <th><%= key.to_s.titleize %></th>
-                <td><a href=<%= "/users/#{value[:user_id]}" %>><%= value[:user_name] %></a></td>
+                <td><%= render partial: "user_link", locals: value %></td>
               </tr>
             <% else %>
               <% child_maps[key] = value %>
@@ -39,9 +39,7 @@
               <th><%= key.to_s.titleize %></th>
               <td>
                 <% if value.is_a?(Array) && value.all? { |e| e.is_a?(Hash) } %>
-                  <% value.each_with_index do |e, i| %>
-                    <%= render partial: "nested_hash", locals: { hash: e, hash_key: "", count: i } %>
-                  <% end %>
+                  <%= render partial: "hash_array", locals: { value: value } %>
                 <% else %>
                   <%= value.to_s %>
                 <% end %>

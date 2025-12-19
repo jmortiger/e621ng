@@ -1,0 +1,4 @@
+<%# locals: (value:) %>
+<% value.each_with_index do |e, i| %>
+  <%= render partial: "nested_hash", locals: { hash: e, hash_key: "", count: i } %>
+<% end %>

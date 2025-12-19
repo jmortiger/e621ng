@@ -1,0 +1,6 @@
+<%# locals: (user_hash: nil, user_name: nil, user_id: nil, **) %>
+<% if user_hash.nil? %>
+  <a href=<%= "/users/#{user_id}" %>><%= user_name %></a>
+<% else %>
+  <%= link_to_user_hash(user_hash, include_artist: true) %>
+<% end %>
