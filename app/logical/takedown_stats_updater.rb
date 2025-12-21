@@ -35,13 +35,13 @@ class TakedownStatsUpdater
   def self.flag_percent_formatter(numeric, symbol = nil)
     case symbol
     when :sum
-      "#{numeric.to_int} instances"
+      "#{numeric.to_int} takedown(s) where the condition was true"
     when :median, :minimum, :maximum
       [false, 0].include?(numeric) ? "false" : "true"
     when :mean, :standard_deviation
-      "#{numeric * 100}%"
+      "#{numeric * 100}% of takedown(s)"
     when :count
-      "#{numeric} record(s)"
+      "#{numeric} takedown(s) checked"
     else
       numeric
     end
@@ -100,7 +100,7 @@ class TakedownStatsUpdater
             ret
           end
     if block_given?
-      ret.each_pair { |k, v| ret[k] = yield(v, k) unless k == :count }
+      ret.each_pair { |k, v| ret[k] = yield(v, k) }
     end
     excluded_keys.each { |e| ret.delete(e) } if excluded_keys.present?
     ret
@@ -156,12 +156,12 @@ class TakedownStatsUpdater
   end
 
   private_class_method def self._count(info, array, **)
-    info[:metrics][:count] = array.length
+    info[:group_metrics][:count] = array.length
     info
   end
 
   private_class_method def self._user_frequency(info, array, **)
-    info[:metrics][:user_frequency] ||= {}
+    info[:group_metrics][:user_frequency] ||= {}
     array.each do |takedown|
       # key = takedown.creator_id.nil? ? :no_user : takedown.creator_id
       key = if takedown.creator_id.nil?
@@ -171,19 +171,19 @@ class TakedownStatsUpdater
             else
               :"#{takedown.creator_id}"
             end
-      info[:metrics][:user_frequency][key] ||= 0
-      info[:metrics][:user_frequency][key] += 1
+      info[:group_metrics][:user_frequency][key] ||= 0
+      info[:group_metrics][:user_frequency][key] += 1
     end
     info
   end
 
   private_class_method def self._post_counts(info, array, **)
-    info[:metrics][:post_counts] = metrics(array.map(&:post_count).sort)
+    info[:group_metrics][:post_counts] = metrics(array.map(&:post_count).sort)
     info
   end
 
   private_class_method def self._has_user(info, array, **)
-    info[:metrics][:has_user] = metrics(
+    info[:group_metrics][:has_user] = metrics(
       array.map { |takedown| takedown.creator_id.nil? ? 0 : 1 }.sort,
       :minimum, :maximum,
       &method(:flag_percent_formatter)
@@ -192,7 +192,7 @@ class TakedownStatsUpdater
   end
 
   private_class_method def self._has_verified_user(info, array, **)
-    info[:metrics][:has_verified_user] = metrics(
+    info[:group_metrics][:has_verified_user] = metrics(
       array.map do |takedown|
         if takedown.creator_id.nil?
           0
@@ -207,7 +207,7 @@ class TakedownStatsUpdater
   end
 
   private_class_method def self._has_approver(info, array, **)
-    info[:metrics][:has_approver] = metrics(
+    info[:group_metrics][:has_approver] = metrics(
       array.map { |takedown| takedown.creator_id.nil? ? 0 : 1 }.sort,
       :minimum, :maximum,
       &method(:flag_percent_formatter)
@@ -217,7 +217,7 @@ class TakedownStatsUpdater
 
   private_class_method def self._estimated_time_til_completion(info, array, is_completed:, **)
     if is_completed
-      info[:metrics][:estimated_time_til_completion] = metrics(
+      info[:group_metrics][:estimated_time_til_completion] = metrics(
         array.map { |takedown| takedown.updated_at - takedown.created_at }.sort,
         zero_value: 0.days,
         &method(:duration_formatter)
@@ -255,7 +255,7 @@ class TakedownStatsUpdater
   end
 
   private_class_method def self._generic_status(info, array, symbol:, **)
-    info[symbol] = metrics(
+    info[:group_metrics][symbol] = metrics(
       filter_by(symbol, array, flagify: true),
       :minimum, :maximum,
       &method(:flag_percent_formatter)
@@ -379,11 +379,11 @@ class TakedownStatsUpdater
     recursive_items: nil,
     **kwargs
   )
-    info = { metrics: {} }
+    info = { group_metrics: {} }
     if kwargs[:group_description].present?
-      info[:metrics][:group_description] = kwargs[:group_description]
+      info[:group_metrics][:group_description] = kwargs[:group_description]
     elsif kwargs[:path].present?
-      info[:metrics][:group_description] = gen_description(
+      info[:group_metrics][:group_description] = gen_description(
         path: kwargs[:path],
         symbol: kwargs[:path].last,
         prior: kwargs[:group_description],
@@ -394,10 +394,10 @@ class TakedownStatsUpdater
     recursive_items.each_pair do |k, v|
       if USER_SYMBOLS.include?(k) && v.is_a?(Hash) && v[:use_user_ids]
         sym = k.to_s[4..].to_sym
-        info[:metrics][:user_frequency] ||= {}
-        (info[:metrics][:user_frequency][sym] ||= {}).merge!(
+        info[:group_metrics][:user_frequency] ||= {}
+        (info[:group_metrics][:user_frequency][sym] ||= {}).merge!(
           (
-            info.dig(:metrics, :user_frequency)&.keys&.select { |e| e&.to_s&.match?(/^[0-9]+$/) }.presence ||
+            info.dig(:group_metrics, :user_frequency)&.keys&.select { |e| e&.to_s&.match?(/^[0-9]+$/) }.presence ||
             array.pluck((k == :has_approver ? :approver_id : :creator_id)).compact.uniq
           ).index_with do |e|
             t_array = array.select { |el| el.creator_id.to_s == e.to_s }
@@ -410,7 +410,7 @@ class TakedownStatsUpdater
               path: kwargs.fetch(:path, []) + [:user_frequency, sym],
               group_description: gen_description(
                 path: kwargs.fetch(:path, []) + [:user_frequency, sym],
-                prior: info[:metrics][:group_description],
+                prior: info[:group_metrics][:group_description],
                 append: "were #{k == :has_approver ? 'approve' : 'create'}d by user #{e}",
               ),
             )
@@ -435,14 +435,14 @@ class TakedownStatsUpdater
                   filter_by(k, array)
                 end
       next if t_array.blank?
-      (info[k] ||= {}).merge!(
+      (info[:group_metrics][k] ||= {}).merge!(
         **yield_numeric_stats_from(
           t_array,
           is_completed: is_completed || COMPLETED_STATUSES.include?(k),
           **(v.is_a?(Hash) ? v : {}),
           path: kwargs.fetch(:path, []) + [k],
           group_description: gen_description(
-            prior: info[:metrics][:group_description],
+            prior: info[:group_metrics][:group_description],
             symbol: k,
             path: kwargs.fetch(:path, []) + [k],
           ),
@@ -534,26 +534,29 @@ class TakedownStatsUpdater
     stats[:total_takedowns] = gen_main_stats(all_takedowns) # .merge(gen_non_status_stats(all_takedowns, include_submitted: false))
     stats[:last_months_takedowns] = gen_main_stats(Takedown.where("created_at >= ?", now.months_ago(1)))
 
-    stats[:user_takedowns] = Takedown.where.not(creator_id: nil)
-    stats[:non_user_takedowns] = Takedown.where(creator_id: nil)
+    # make_dedicated_users_stats_fun(stats)
 
-    ### Users ###
+    # stats[:posts_per_request] = TakedownStatsUpdater.metrics(Takedown.all.map(&:post_count).sort)
 
-    stats[:users_counts] = stats[:user_takedowns].group(:creator_id).count
+    # puts output_tree(stats)
+    Cache.redis.set("e6stats_takedown", stats.to_json)
+  end
+
+  def self.make_dedicated_users_stats_fun(stats)
+    user_takedowns = Takedown.where.not(creator_id: nil)
+    non_user_takedowns = Takedown.where(creator_id: nil)
+
+    ## Users ###
+
+    stats[:users_counts] = user_takedowns.group(:creator_id).count
     stats[:total_users] = stats[:users_counts].length
-    Takedown.joins(creator: { artists: :linked_user_id })
     stats[:total_verified_users_count] = Takedown.joins("INNER JOIN #{User.table_name} ON #{User.table_name}.id = #{Takedown.table_name}.creator_id INNER JOIN #{Artist.table_name} ON #{Artist.table_name}.linked_user_id = #{User.table_name}.id").group(:creator_id).count
     stats[:user_stats] = stats[:users_counts].keys.to_h do |creator_id|
-      takedowns = stats[:user_takedowns].select { |e| e.creator_id == creator_id }
+      takedowns = user_takedowns.select { |e| e.creator_id == creator_id }
       [
         creator_id,
         TakedownStatsUpdater.gen_main_stats(takedowns),
       ]
     end
-
-    stats[:posts_per_request] = TakedownStatsUpdater.metrics(Takedown.all.map(&:post_count).sort)
-
-    # puts output_tree(stats)
-    Cache.redis.set("e6stats_takedown", stats.to_json)
   end
 end
