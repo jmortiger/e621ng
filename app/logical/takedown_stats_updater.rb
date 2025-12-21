@@ -1,6 +1,15 @@
 # frozen_string_literal: true
 
 class TakedownStatsUpdater
+  # def self.output_tree(hash, depth: 0)
+  #   ret = []
+  #   hash.each_entry do |k, v|
+  #     ret << "#{(0...(depth - 1)).map { |_i| '|  ' }.join}L #{k}"
+  #     ret.push(output_tree(v, depth: depth + 1)) if v.presence.is_a?(Hash)
+  #   end
+  #   ret.join("\n")
+  # end
+
   # #region metric formatters
   # A formatter for `TakedownStatsUpdater.metrics`that handles `ActiveSupport::Duration`s.
   # ### Parameters
@@ -97,6 +106,9 @@ class TakedownStatsUpdater
     ret
   end
 
+  FILTER_SYMBOLS = %i[approved denied partial inactive pending completed incompleted has_user has_verified_user has_approver].freeze
+  PARAM_FILTER_SYMBOLS = %i[has_user has_verified_user has_approver].freeze
+
   # Gets the requested subset of takedowns from the given array.
   # ### Parameters
   # * `symbol` {`Symbol`}: The filtration criteria.
@@ -105,6 +117,8 @@ class TakedownStatsUpdater
   # a `1` or `0` if the given criteria is true or false, respectively.
   # * `:user_id` {`Numeric`|`nil`}: An optional id to match when `symbol` is `:has_user` or
   # `:has_verified_user`.
+  # * `:true_flag` [`1`]: The value to use for true conditions if `flagify`ing.
+  # * `:false_flag` [`1`]: The value to use for false conditions if `flagify`ing.
   # ### Returns
   # If `flagify`, an `Array` the ordered true/false output of the filtration criteria; otherwise, an
   # `Array` of elements in `array` that matched the criteria.
@@ -113,23 +127,19 @@ class TakedownStatsUpdater
   def self.filter_by(symbol, array, flagify: false, invert: false, **kwargs)
     v = case symbol
         when :approved, :denied, :partial, :inactive, :pending, :completed, :incompleted, :has_user, :has_verified_user, :has_approver
-          # array.inject([]) { |accum, takedown| takedown.send(:"#{symbol}?") && !invert ? (accum << takedown) : accum }
           array.select { |takedown| takedown.send(:"#{symbol}?") && !invert }
         end
     if !invert && kwargs.key?(:user_id)
       if %i[has_user has_verified_user].include?(symbol)
-        # v = v.inject([]) { |accum, takedown| takedown.creator_id == kwargs[:user_id] ? (accum << takedown) : accum }
         v = v.select { |takedown| takedown.creator_id == kwargs[:user_id] }
       elsif symbol == :has_approver
-        # v = v.inject([]) { |accum, takedown| takedown.approver_id == kwargs[:user_id] ? (accum << takedown) : accum }
         v = v.select { |takedown| takedown.approver_id == kwargs[:user_id] }
       end
     end
     if flagify
-      # t = kwargs.fetch(:true_flag, 1)
-      # f = kwargs.fetch(:false_flag, 0)
-      # v = array.map { |takedown| v.include?(takedown) ? t : f }
-      v = array.map { |takedown| v.include?(takedown) ? 1 : 0 }
+      t = kwargs.fetch(:true_flag, 1)
+      f = kwargs.fetch(:false_flag, 0)
+      v = array.map { |takedown| v.include?(takedown) ? t : f }
     end
     v
   end
@@ -310,6 +320,36 @@ class TakedownStatsUpdater
     pending: "are pending",
   }.freeze
 
+  def self.gen_description(path: nil, symbol: nil, append: nil, prior: nil)
+    d_gen = ->(sym) { SYMBOL_SNIPPETS[sym] || sym.to_s.titleize }
+    if prior.present? && (symbol.present? || append.present?)
+      if symbol.present?
+        if /^(.+)(?:,? and )(.+)\.$/.match(prior)
+          "#{$1}, #{$2}, and #{d_gen.call(symbol)}."
+        else
+          "#{prior[0..-2]} and #{d_gen.call(symbol)}."
+        end
+      else
+        "#{prior[0..-2]} and #{append}"
+      end
+    elsif path.present?
+      "Stats for all takedowns that #{
+        case path.length
+        when 1
+          d_gen.call(path[0])
+        when 2
+          path.map { |e| d_gen.call(e) }.join(' and ')
+        else
+          "#{
+            path
+              .first(path.length - 1)
+              .map { |e| d_gen.call(e) }
+              .join(', ')
+          }, and #{d_gen.call(path.last)}"
+        end}."
+    end
+  end
+
   # TODO: FINISH DOCS
   # Generates the given suite of numerical statistics that can be derived from the given takedowns.
   # ### Parameters
@@ -340,61 +380,53 @@ class TakedownStatsUpdater
     **kwargs
   )
     info = { metrics: {} }
-    if kwargs[:path].present?
-      d_gen = ->(symbol) { SYMBOL_SNIPPETS[symbol] || symbol.to_s.titlize }
-      info[:metrics][:group_description] = "Stats for all takedowns that "
-      info[:metrics][:group_description] += case kwargs[:path].length
-                                            when 1
-                                              d_gen.call(kwargs[:path][0])
-                                            when 2
-                                              kwargs[:path].map { |e| d_gen.call(e) }.join(" and ")
-                                            else
-                                              "#{
-                                                kwargs[:path]
-                                                  .first(kwargs[:path].length - 1)
-                                                  .map { |e| d_gen.call(e) }
-                                                  .join(', ')
-                                              }, and #{
-                                                d_gen
-                                                  .call(kwargs[:path]
-                                                  .last)
-                                              }"
-                                            end
-      info[:metrics][:group_description] += "."
+    if kwargs[:group_description].present?
+      info[:metrics][:group_description] = kwargs[:group_description]
+    elsif kwargs[:path].present?
+      info[:metrics][:group_description] = gen_description(
+        path: kwargs[:path],
+        symbol: kwargs[:path].last,
+        prior: kwargs[:group_description],
+      )
     end
     items.each { |e| send(YIELD_JUMP_TABLE[e], info, array, is_completed: is_completed, symbol: e) }
-    return info unless recursive_items.is_a?(Hash)
+    return info unless recursive_items.present? && recursive_items.is_a?(Hash)
     recursive_items.each_pair do |k, v|
       if USER_SYMBOLS.include?(k) && v.is_a?(Hash) && v[:use_user_ids]
         sym = k.to_s[4..].to_sym
-        (info[:metrics][:user_frequency][sym] ||= {})
-          .merge!(
-            (
-              info.dig(:metrics, :user_frequency)&.keys ||
-              array.pluck(&(k == :has_approver ? :approver_id : :creator_id)).uniq.compact
-            ).index_with do |e|
-              t_array = array.select { |el| el.creator_id == e }
-              next nil if t_array.blank?
-              # user = t_array.first.send(sym.to_s.end_with?("user") ? :creator : :approver)
-              yield_numeric_stats_from(
-                t_array,
-                is_completed: is_completed,
-                **(v.is_a?(Hash) ? v : {}),
+        info[:metrics][:user_frequency] ||= {}
+        (info[:metrics][:user_frequency][sym] ||= {}).merge!(
+          (
+            info.dig(:metrics, :user_frequency)&.keys&.select { |e| e&.to_s&.match?(/^[0-9]+$/) }.presence ||
+            array.pluck((k == :has_approver ? :approver_id : :creator_id)).compact.uniq
+          ).index_with do |e|
+            t_array = array.select { |el| el.creator_id.to_s == e.to_s }
+            next nil if t_array.blank?
+            # user = t_array.first.send(sym.to_s.end_with?("user") ? :creator : :approver)
+            yield_numeric_stats_from(
+              t_array,
+              is_completed: is_completed,
+              **(v.is_a?(Hash) ? v : {}),
+              path: kwargs.fetch(:path, []) + [:user_frequency, sym],
+              group_description: gen_description(
                 path: kwargs.fetch(:path, []) + [:user_frequency, sym],
-              )
-              # .merge({
-              #   user_hash: {
-              #     level_css_class: user.level_css_class,
-              #     can_approve_posts?: user.can_approve_posts?,
-              #     can_upload_free?: user.can_upload_free?,
-              #     is_banned?: user.is_banned?,
-              #     pretty_name: user.pretty_name,
-              #     id: user.id,
-              #     is_verified?: user.is_verified?,
-              #   },
-              # })
-            end,
-          )
+                prior: info[:metrics][:group_description],
+                append: "were #{k == :has_approver ? 'approve' : 'create'}d by user #{e}",
+              ),
+            )
+            # .merge({
+            #   user_hash: {
+            #     level_css_class: user.level_css_class,
+            #     can_approve_posts?: user.can_approve_posts?,
+            #     can_upload_free?: user.can_upload_free?,
+            #     is_banned?: user.is_banned?,
+            #     pretty_name: user.pretty_name,
+            #     id: user.id,
+            #     is_verified?: user.is_verified?,
+            #   },
+            # })
+          end,
+        )
         next
       end
       t_array = if v.is_a?(Hash) && v[:filter_hash]
@@ -409,6 +441,11 @@ class TakedownStatsUpdater
           is_completed: is_completed || COMPLETED_STATUSES.include?(k),
           **(v.is_a?(Hash) ? v : {}),
           path: kwargs.fetch(:path, []) + [k],
+          group_description: gen_description(
+            prior: info[:metrics][:group_description],
+            symbol: k,
+            path: kwargs.fetch(:path, []) + [k],
+          ),
         ),
       )
     end
@@ -432,24 +469,6 @@ class TakedownStatsUpdater
   # Those hashes have the following keys:
   def self.gen_main_stats(takedowns)
     # status_map = {
-    #   # #region Simplest
-    #   # completed: nil,
-    #   # incompleted: nil,
-    #   # approved: nil,
-    #   # denied: nil,
-    #   # partial: nil,
-    #   # inactive: nil,
-    #   # pending: nil,
-    #   # #endregion Simplest
-    #   # #region 2nd Simplest
-    #   # completed: {
-    #   #   items: DEFAULT_YIELD_ITEMS + COMPLETED_STATUSES - [:completed],
-    #   # },
-    #   # incompleted: {
-    #   #   items: DEFAULT_YIELD_ITEMS + ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted],
-    #   # },
-    #   # #endregion 2nd Simplest
-    #   # #region Most complex
     #   completed: {
     #     items: COMPLETED_STATUSES - [:completed] + DEFAULT_YIELD_ITEMS,
     #     recursive_items: (COMPLETED_STATUSES - [:completed]).index_with { |_e| nil },
@@ -458,7 +477,6 @@ class TakedownStatsUpdater
     #     items: ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted] + DEFAULT_YIELD_ITEMS,
     #     recursive_items: (ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted]).index_with { |_e| nil },
     #   },
-    #   # #endregion Most complex
     # }
     # user_frequency_map = {
     #   has_user: {
@@ -474,26 +492,9 @@ class TakedownStatsUpdater
     # end
     yield_numeric_stats_from(
       takedowns,
+      group_description: "Stats for all takedowns that are in the DB.",
       items: ALL_STATUS_SYMBOLS + DEFAULT_YIELD_ITEMS,
       recursive_items: {
-        # #region Simplest
-        # completed: nil,
-        # incompleted: nil,
-        # approved: nil,
-        # denied: nil,
-        # partial: nil,
-        # inactive: nil,
-        # pending: nil,
-        # #endregion Simplest
-        # #region 2nd Simplest
-        # completed: {
-        #   items: DEFAULT_YIELD_ITEMS + COMPLETED_STATUSES - [:completed],
-        # },
-        # incompleted: {
-        #   items: DEFAULT_YIELD_ITEMS + ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted],
-        # },
-        # #endregion 2nd Simplest
-        # #region Most complex
         completed: {
           items: COMPLETED_STATUSES - [:completed] + DEFAULT_YIELD_ITEMS,
           recursive_items: (COMPLETED_STATUSES - [:completed]).index_with { |_e| nil },
@@ -502,7 +503,11 @@ class TakedownStatsUpdater
           items: ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted] + DEFAULT_YIELD_ITEMS,
           recursive_items: (ALL_STATUS_SYMBOLS - COMPLETED_STATUSES - [:incompleted]).index_with { |_e| nil },
         },
-        # #endregion Most complex
+        has_user: {
+          use_user_ids: true,
+          items: COMPLETED_STATUSES - [:completed] + DEFAULT_YIELD_ITEMS - %i[has_user],
+          recursive_items: (COMPLETED_STATUSES - %i[completed]).index_with { |_e| nil },
+        },
       },
     )
   end
@@ -518,9 +523,9 @@ class TakedownStatsUpdater
     end
 
     now = Time.now
-    daily_average = ->(total, sym: :started_takedowns) do
-      (total / ((now - stats[sym]) / (60 * 60 * 24))).round
-    end
+    # daily_average = ->(total, sym: :started_takedowns) do
+    #   (total / ((now - stats[sym]) / (60 * 60 * 24))).round
+    # end
 
     ### Takedowns ###
 
@@ -548,6 +553,7 @@ class TakedownStatsUpdater
 
     stats[:posts_per_request] = TakedownStatsUpdater.metrics(Takedown.all.map(&:post_count).sort)
 
+    # puts output_tree(stats)
     Cache.redis.set("e6stats_takedown", stats.to_json)
   end
 end
