@@ -1,11 +1,14 @@
 # frozen_string_literal: true
 
 class PostFlag < ApplicationRecord
-  class Error < Exception;
+  class Error < Exception
   end
 
-  COOLDOWN_PERIOD = 1.days
-  MAPPED_REASONS = Danbooru.config.flag_reasons.map { |i| [i[:name], i[:reason]] }.to_h
+  COOLDOWN_PERIOD = 1.day
+  MAPPED_REASONS = Danbooru.config.flag_reasons.to_h { |i| [i[:name], i[:reason]] }
+
+  # Used to check if this deletion/flag is a takedown request
+  TAKEDOWN_REASON_MATCHER = /\Atakedown #[0-9]+:\s/
 
   belongs_to_creator :class_name => "User"
   user_status_counter :post_flag_count
@@ -24,8 +27,18 @@ class PostFlag < ApplicationRecord
   scope :by_users, -> { where.not(creator: User.system) }
   scope :by_system, -> { where(creator: User.system) }
   scope :in_cooldown, -> { by_users.where("created_at >= ?", COOLDOWN_PERIOD.ago) }
+  # NOTE: Interal quotation is important for some reason.
+  # NOTE: This depends on the start of the reason exactly matching the pattern
+  # `^takedown #[0-9]+:\s`. Changing how takedown reasons are applied will completely ruin this
+  # unless also modifying preexisting flags to match. `TAKEDOWN_REASON_MATCHER` must also be updated
+  # alongside this scope.
+  scope :is_takedown, -> { where("\"post_flags\".\"is_deletion\" = TRUE AND \"post_flags\".\"reason\" ~ '^takedown #[0-9]+:\\s'") }
 
   attr_accessor :parent_id, :reason_name, :force_flag
+
+  def is_takedown?
+    is_deletion && TAKEDOWN_REASON_MATCHER.match?(reason)
+  end
 
   module SearchMethods
     def post_tags_match(query)

@@ -22,10 +22,10 @@ class TakedownJob < ApplicationJob
       @takedown.actual_posts.find_each do |p|
         if @takedown.should_delete(p.id)
           next if p.is_deleted?
-          p.delete!("takedown ##{@takedown.id}: #{del_reason}", { force: true })
+          p.delete!("takedown ##{@takedown.id}: #{del_reason}", { force: true, blame_uploader: false })
         else
           next unless p.is_deleted?
-          p.undelete!({ force: true })
+          p.undelete!({ force: true, from_takedown: true })
         end
       end
     end

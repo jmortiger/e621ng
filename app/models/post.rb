@@ -1499,9 +1499,17 @@ class Post < ApplicationRecord
       is_deleted?
     end
 
+    # "Deletes" the post with the given reason.
+    # ### Parameters
+    # * `reason`
+    # * `options`
+    # * `:force` [`false`]: Delete it even if status is locked.
+    # * `:move_favorites` [`nil`]: Move favorites & post sets to parent?
+    # * `:blame_uploader` [`true`]: Count this deletion against the uploader? Unless used with a
+    # takedown, would incorrectly increment user's deleted post count on undeletion.
     def delete!(reason, options = {})
       if is_status_locked? && !options.fetch(:force, false)
-        self.errors.add(:is_status_locked, "; cannot delete post")
+        errors.add(:is_status_locked, "; cannot delete post")
         return false
       end
 
@@ -1520,16 +1528,16 @@ class Post < ApplicationRecord
       force_flag = options.fetch(:force, false)
       Post.with_timeout(30_000) do
         transaction do
-          flag = flags.create(reason: reason, reason_name: 'deletion', is_resolved: false, is_deletion: true, force_flag: force_flag)
+          flag = flags.create(reason: reason, reason_name: "deletion", is_resolved: false, is_deletion: true, force_flag: force_flag)
 
           if flag.errors.any?
-            raise PostFlag::Error.new(flag.errors.full_messages.join("; "))
+            raise PostFlag::Error, flag.errors.full_messages.join("; ")
           end
 
           update(
             is_deleted: true,
             is_pending: false,
-            is_flagged: false
+            is_flagged: false,
           )
           decrement_tag_post_counts
           move_files_on_delete
@@ -1539,14 +1547,16 @@ class Post < ApplicationRecord
 
       # XXX This must happen *after* the `is_deleted` flag is set to true (issue #3419).
       # We don't care if these fail per-se so they are outside the transaction.
-      UserStatus.for_user(uploader_id).update_all("post_deleted_count = post_deleted_count + 1")
+      if options.fetch(:blame_uploader, true)
+        UserStatus.for_user(uploader_id).update_all("post_deleted_count = post_deleted_count + 1")
+      end
       give_favorites_to_parent if options[:move_favorites]
       give_post_sets_to_parent if options[:move_favorites]
       reject_pending_replacements
     end
 
     def reject_pending_replacements
-      replacements.where(status: 'pending').update_all(status: 'rejected')
+      replacements.where(status: "pending").update_all(status: "rejected")
     end
 
     def undelete!(options = {})
@@ -1559,23 +1569,26 @@ class Post < ApplicationRecord
         raise User::PrivilegeError, "You cannot undelete a post you uploaded"
       end
 
-      if !is_deleted
+      unless is_deleted
         errors.add(:base, "Post is not deleted")
         return
       end
 
+      options[:restore_user_count] = !deletion_flag.is_takedown? unless options.key?(:restore_user_count)
       transaction do
         self.is_deleted = false
         self.is_pending = false
         self.approver_id = CurrentUser.id
-        flags.each { |x| x.resolve! }
+        flags.each(&:resolve!)
         increment_tag_post_counts
         save
         approvals.create(user: CurrentUser.user)
         PostEvent.add(id, CurrentUser.user, :undeleted)
       end
       move_files_on_undelete
-      UserStatus.for_user(uploader_id).update_all("post_deleted_count = post_deleted_count - 1")
+      if options[:restore_user_count]
+        UserStatus.for_user(uploader_id).update_all("post_deleted_count = post_deleted_count - 1")
+      end
     end
 
     def deletion_flag
@@ -1607,7 +1620,7 @@ class Post < ApplicationRecord
 
     def revert_to(target)
       if id != target.post_id
-        raise RevertError.new("You cannot revert to a previous version of another post.")
+        raise RevertError, "You cannot revert to a previous version of another post."
       end
 
       self.tag_string = target.tags
