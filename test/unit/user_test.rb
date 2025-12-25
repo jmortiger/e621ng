@@ -343,7 +343,7 @@ class UserTest < ActiveSupport::TestCase
 
     context "when fixing counts" do
       should "not raise" do
-        assert_nothing_raised { @user.refresh_counts! }
+        assert_nothing_raised { @user.refresh_all_counts! }
       end
     end
 

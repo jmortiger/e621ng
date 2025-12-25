@@ -856,7 +856,26 @@ class User < ApplicationRecord
       user_status&.own_post_replaced_penalize_count || 0
     end
 
-    def refresh_counts!
+    def refresh_counts!(fields = %i[post_count post_deleted_count post_update_count favorite_count note_count own_post_replaced_count own_post_replaced_penalize_count post_replacement_rejected_count])
+      self.class.without_timeout do
+        UserStatus.where(user_id: id).update_all(
+          fields.index_with do |field|
+            case field
+            when :post_count then Post.for_user(id).count
+            when :post_deleted_count then Post.for_user(id).deleted.not_taken_down # Post.for_user(id).deleted.count
+            when :post_update_count then PostVersion.for_user(id).count
+            when :favorite_count then Favorite.for_user(id).count
+            when :note_count then NoteVersion.for_user(id).count
+            when :own_post_replaced_count then PostReplacement.for_uploader_on_approve(id).count
+            when :own_post_replaced_penalize_count then PostReplacement.penalized.for_uploader_on_approve(id).count
+            when :post_replacement_rejected_count then post_replacements.rejected.count
+            end
+          end,
+        )
+      end
+    end
+
+    def refresh_all_counts!
       self.class.without_timeout do
         UserStatus.where(user_id: id).update_all(
           post_count: Post.for_user(id).count,

@@ -9,7 +9,7 @@ module Maintenance
       end
 
       def create
-        CurrentUser.user.refresh_counts!
+        CurrentUser.user.refresh_all_counts!
         flash[:notice] = "Counts have been refreshed"
         redirect_to user_path(CurrentUser.id)
       end

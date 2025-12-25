@@ -83,7 +83,7 @@ class UsersController < ApplicationController
   def fix_counts
     @user = User.find(User.name_or_id_to_id_forced(params[:id]))
 
-    @user.refresh_counts!
+    @user.refresh_all_counts!
     flash[:notice] = "Counts have been refreshed"
 
     redirect_to user_path(@user)
