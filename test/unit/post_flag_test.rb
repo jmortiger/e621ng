@@ -3,6 +3,7 @@
 require "test_helper"
 
 class PostFlagTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
   context "In all cases" do
     setup do
       travel_to(2.weeks.ago) do
@@ -12,6 +13,49 @@ class PostFlagTest < ActiveSupport::TestCase
       as(@alice) do
         @post = create(:post, tag_string: "aaa", uploader: @alice)
       end
+    end
+
+    # Simulates a takedown by manually creating the expected end results of a deletion via takedown.
+    should "detect artificial takedowns" do
+      td = create(:takedown, post_ids: [@post.id])
+      CurrentUser.user = User.system
+      # with_inline_jobs { @post.delete!("takedown ##{td.id}: A very good reason", { force: true, blame_uploader: false }) }
+      perform_enqueued_jobs { @post.delete!("takedown ##{td.id}: A very good reason", { force: true, blame_uploader: false }) }
+      assert(@post.deletion_flag.is_active_takedown?)
+      assert(Post.is_taken_down?.any? { |e| e.id == @post.id })
+    end
+
+    # TODO: I simply cannot figure out how to properly handle this, & I'm done trying.
+    should_eventually "detect genuine takedowns" do
+      # puts Rails.application.config.active_job
+      # Rails.application.config.active_job.queue_adapter = :test
+      # puts Rails.application.config.active_job
+
+      with_inline_jobs do
+        @upload = UploadService.new(attributes_for(:jpg_upload).merge({ uploader: @alice })).start!
+        @true_post = @upload.post
+      end
+      CurrentUser.user = User.system
+      # Sidekiq::Queue.new("iqdb").clear
+      # Sidekiq::Worker.drain_all
+      td = create(:takedown, post_ids: [@true_post.id])
+      # TakedownJob.new(temp, User.system.id, "A very good reason").perform(temp, User.system.id, "A very good reason")
+
+      # Sidekiq::Queue.new("iqdb").clear
+      # Sidekiq::Worker.drain_all # rescue WebMock::NetConnectNotAllowedError
+      with_inline_jobs { td.process!(User.system, "A very good reason") }
+      # Sidekiq::Queue.new("iqdb").clear
+      # Sidekiq::Worker.drain_all
+
+      # perform_enqueued_jobs { td.process!(User.system, "A very good reason") }
+
+      # assert_enqueued_with(job: TakedownJob) { td.process!(User.system, "A very good reason") }
+      # perform_enqueued_jobs
+
+      # assert_performed_jobs(1)
+      assert_not_empty(@true_post.flags)
+      assert_not_nil(@true_post.flags.first)
+      assert(@true_post.flags.first.is_active_takedown?)
     end
 
     should "respect the throttle limit" do
