@@ -642,7 +642,7 @@ class User < ApplicationRecord
 
     def upload_limit_pieces
       @upload_limit_pieces ||= begin
-        deleted_count = Post.deleted.for_user(id).count
+        deleted_count = UserStatus::CountMethods.post_deleted(id)
         rejected_replacement_count = post_replacement_rejected_count
         replaced_penalize_count = own_post_replaced_penalize_count
         unapproved_count = Post.pending_or_flagged.for_user(id).count
@@ -747,22 +747,27 @@ class User < ApplicationRecord
   end
 
   module CountMethods
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def wiki_page_version_count
       user_status&.wiki_edit_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def post_update_count
       user_status&.post_update_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def post_upload_count
       user_status&.post_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def post_deleted_count
       user_status&.post_deleted_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def note_version_count
       user_status&.note_count || 0
     end
@@ -771,30 +776,37 @@ class User < ApplicationRecord
       note_version_count
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def artist_version_count
       user_status&.artist_edit_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def pool_version_count
       user_status&.pool_edit_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def forum_post_count
       user_status&.forum_post_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def favorite_count
       user_status&.favorite_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def comment_count
       user_status&.comment_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def flag_count
       user_status&.post_flag_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def ticket_count
       user_status&.ticket_count || 0
     end
@@ -844,48 +856,44 @@ class User < ApplicationRecord
       feedback_pieces[:deleted]
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def post_replacement_rejected_count
       user_status&.post_replacement_rejected_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def own_post_replaced_count
       user_status&.own_post_replaced_count || 0
     end
 
+    # A shortcut to retrieve the field from the associated `UserStatus` or 0 if not found.
     def own_post_replaced_penalize_count
       user_status&.own_post_replaced_penalize_count || 0
     end
 
-    def refresh_counts!(fields = %i[post_count post_deleted_count post_update_count favorite_count note_count own_post_replaced_count own_post_replaced_penalize_count post_replacement_rejected_count])
+    # Updates the specified fields for all of this `User`'s `UserStatus` records.
+    # ### Parameters
+    # * `*fields` {`Symbol`|`String`}: The fields to update.
+    def refresh_counts!(*fields)
       self.class.without_timeout do
         UserStatus.where(user_id: id).update_all(
-          fields.index_with do |field|
-            case field
-            when :post_count then Post.for_user(id).count
-            when :post_deleted_count then Post.for_user(id).deleted.not_taken_down # Post.for_user(id).deleted.count
-            when :post_update_count then PostVersion.for_user(id).count
-            when :favorite_count then Favorite.for_user(id).count
-            when :note_count then NoteVersion.for_user(id).count
-            when :own_post_replaced_count then PostReplacement.for_uploader_on_approve(id).count
-            when :own_post_replaced_penalize_count then PostReplacement.penalized.for_uploader_on_approve(id).count
-            when :post_replacement_rejected_count then post_replacements.rejected.count
-            end
-          end,
+          fields.index_with { |field| UserStatus::CountMethods.send(field, id) },
         )
       end
     end
 
+    # Updates all fields for all of this `User`'s `UserStatus` records.
     def refresh_all_counts!
       self.class.without_timeout do
         UserStatus.where(user_id: id).update_all(
-          post_count: Post.for_user(id).count,
-          post_deleted_count: Post.for_user(id).deleted.count,
-          post_update_count: PostVersion.for_user(id).count,
-          favorite_count: Favorite.for_user(id).count,
-          note_count: NoteVersion.for_user(id).count,
-          own_post_replaced_count: PostReplacement.for_uploader_on_approve(id).count,
-          own_post_replaced_penalize_count: PostReplacement.penalized.for_uploader_on_approve(id).count,
-          post_replacement_rejected_count: post_replacements.rejected.count,
+          post_count: UserStatus::CountMethods.post(id),
+          post_deleted_count: UserStatus::CountMethods.post_deleted(id),
+          post_update_count: UserStatus::CountMethods.post_update(id),
+          favorite_count: UserStatus::CountMethods.favorite(id),
+          note_count: UserStatus::CountMethods.note(id),
+          own_post_replaced_count: UserStatus::CountMethods.own_post_replaced(id),
+          own_post_replaced_penalize_count: UserStatus::CountMethods.own_post_replaced_penalize(id),
+          post_replacement_rejected_count: UserStatus::CountMethods.post_replacement_rejected(self),
         )
       end
     end

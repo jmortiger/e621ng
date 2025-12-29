@@ -108,11 +108,10 @@ class UsersController < ApplicationController
           flash[:notice] = "Sign up failed: #{@user.errors.full_messages.join('; ')}"
         end
         set_current_user
-        respond_with(@user)
       else
         flash[:notice] = "Sign up failed"
-        respond_with(@user)
       end
+      respond_with(@user)
     end
   rescue ::Mailgun::CommunicationError
     session[:user_id] = nil
