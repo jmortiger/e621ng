@@ -1574,7 +1574,7 @@ class Post < ApplicationRecord
         return
       end
 
-      options[:restore_user_count] = !deletion_flag.is_takedown? unless options.key?(:restore_user_count)
+      options[:restore_user_count] = !deletion_flag.is_active_takedown? unless options.key?(:restore_user_count)
       transaction do
         self.is_deleted = false
         self.is_pending = false
@@ -1837,7 +1837,40 @@ class Post < ApplicationRecord
     def tag_match_sql(query)
       PostQueryBuilder.new(query).search
     end
+
+    # Is this post currently deleted via takedown? Inverse of `is_not_taken_down?`
+    #
+    # NOTE: While results should always align with associated scope, this solely looks at `deletion_flag`. To check all flags, use the commented impl. of `not_taken_down?`.
+    def is_taken_down?
+      !not_taken_down?
+    end
+
+    def was_taken_down?
+      flags.select(&:is_takedown?).presence.all?(&:is_resolved)
+    end
+
+    # Is this post not currently deleted via takedown?
+    # Inverse of `is_taken_down?`; solely exists to maintain parity with scopes.
+    #
+    # NOTE: While results should always align with associated scope, this solely looks at `deletion_flag`. To check all flags, use the commented impl.
+    def not_taken_down?
+      # flags.none?(&:is_active_takedown?)
+      !deletion_flag&.is_active_takedown?
+    end
   end
+
+  # #region Should be redundant # rubocop:disable Layout/CommentIndentation
+=begin # rubocop:disable Style/BlockComments
+  # scope :is_taken_down, -> { distinct(true).associated(:flags).where("\"flags\".\"is_deletion\" = TRUE AND \"flags\".\"reason\" ~ '^takedown #[0-9]+:\\s' AND \"flags\".\"is_resolved\" = FALSE") }
+  scope :is_taken_down, -> { where("EXISTS (SELECT 1 FROM post_flags pf WHERE pf.post_id = posts.id AND pf.is_deletion = TRUE AND pf.reason ~ '^takedown #[0-9]+:\\s' AND pf.is_resolved = FALSE)") }
+  scope :was_taken_down, -> { distinct(true).associated(:flags).where("\"flags\".\"is_deletion\" = TRUE AND \"flags\".\"reason\" ~ '^takedown #[0-9]+:\\s' AND \"flags\".\"is_resolved\" = TRUE") }
+  scope :not_taken_down, -> { where("NOT EXISTS (SELECT 1 FROM post_flags pf WHERE pf.post_id = posts.id AND pf.is_deletion = TRUE AND pf.reason ~ '^takedown #[0-9]+:\\s' AND pf.is_resolved = FALSE)") }
+=end
+  # #endregion Should be redundant
+  # scope :is_taken_down, -> { distinct(true).associated(:flags).where("\"flags\".\"is_deletion\" = TRUE AND \"flags\".\"reason\" ~ #{PostFlag::TAKEDOWN_REASON_REGEX_SQL} AND \"flags\".\"is_resolved\" = FALSE") }
+  scope :is_taken_down, -> { where("EXISTS (SELECT 1 FROM post_flags pf WHERE pf.post_id = posts.id AND pf.is_deletion = TRUE AND pf.reason ~ #{PostFlag::TAKEDOWN_REASON_REGEX_SQL} AND pf.is_resolved = FALSE)") }
+  scope :was_taken_down, -> { distinct(true).associated(:flags).where("\"flags\".\"is_deletion\" = TRUE AND \"flags\".\"reason\" ~ #{PostFlag::TAKEDOWN_REASON_REGEX_SQL} AND \"flags\".\"is_resolved\" = TRUE") }
+  scope :not_taken_down, -> { where("NOT EXISTS (SELECT 1 FROM post_flags pf WHERE pf.post_id = posts.id AND pf.is_deletion = TRUE AND pf.reason ~ #{PostFlag::TAKEDOWN_REASON_REGEX_SQL} AND pf.is_resolved = FALSE)") }
 
   module IqdbMethods
     extend ActiveSupport::Concern

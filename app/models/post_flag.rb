@@ -7,10 +7,13 @@ class PostFlag < ApplicationRecord
   COOLDOWN_PERIOD = 1.day
   MAPPED_REASONS = Danbooru.config.flag_reasons.to_h { |i| [i[:name], i[:reason]] }
 
-  # Used to check if this deletion/flag is a takedown request
-  TAKEDOWN_REASON_MATCHER = /\Atakedown #[0-9]+:\s/
+  # Used to check if this deletion/flag is a takedown request. Must be updated alongside `TAKEDOWN_REASON_REGEX_SQL`.
+  TAKEDOWN_REASON_REGEX = /\Atakedown #[0-9]+:\s/
 
-  belongs_to_creator :class_name => "User"
+  # Used to check if this deletion/flag is a takedown request. Must be updated alongside `TAKEDOWN_REASON_REGEX`.
+  TAKEDOWN_REASON_REGEX_SQL = -"'^takedown #[0-9]+:\\s'"
+
+  belongs_to_creator class_name: "User"
   user_status_counter :post_flag_count
   belongs_to :post
   validate :validate_creator_is_not_limited, on: :create
@@ -27,17 +30,23 @@ class PostFlag < ApplicationRecord
   scope :by_users, -> { where.not(creator: User.system) }
   scope :by_system, -> { where(creator: User.system) }
   scope :in_cooldown, -> { by_users.where("created_at >= ?", COOLDOWN_PERIOD.ago) }
+  # Selects `PostFlag` records that both are deletion flags & match the takedown reason formatting.
+  #
   # NOTE: Interal quotation is important for some reason.
-  # NOTE: This depends on the start of the reason exactly matching the pattern
-  # `^takedown #[0-9]+:\s`. Changing how takedown reasons are applied will completely ruin this
-  # unless also modifying preexisting flags to match. `TAKEDOWN_REASON_MATCHER` must also be updated
+  # NOTE: This depends on the start of the reason exactly matching `TAKEDOWN_REASON_REGEX`. Changing how takedown reasons are applied will completely ruin this
+  # unless also modifying preexisting flags to match. `TAKEDOWN_REASON_REGEX` must also be updated
   # alongside this scope.
-  scope :is_takedown, -> { where("\"post_flags\".\"is_deletion\" = TRUE AND \"post_flags\".\"reason\" ~ '^takedown #[0-9]+:\\s'") }
+  scope :is_takedown, -> { where("\"post_flags\".\"is_deletion\" = TRUE AND \"post_flags\".\"reason\" ~ #{TAKEDOWN_REASON_REGEX_SQL}") }
+  scope :is_active_takedown, -> { where(is_resolved: false).is_takedown }
 
   attr_accessor :parent_id, :reason_name, :force_flag
 
+  def is_active_takedown?
+    is_takedown? && !is_resolved
+  end
+
   def is_takedown?
-    is_deletion && TAKEDOWN_REASON_MATCHER.match?(reason)
+    is_deletion && TAKEDOWN_REASON_REGEX.match?(reason)
   end
 
   module SearchMethods
@@ -127,6 +136,7 @@ class PostFlag < ApplicationRecord
     post.update_index
   end
 
+  # #region Validators
   def validate_creator_is_not_limited
     return if is_deletion
 
@@ -155,16 +165,16 @@ class PostFlag < ApplicationRecord
 
   def validate_reason
     case reason_name
-    when 'deletion'
+    when "deletion"
       # You're probably looking at this line as you get this validation failure
       errors.add(:reason, "is not one of the available choices") unless is_deletion
-    when 'inferior'
-      unless parent_post.present?
+    when "inferior"
+      if parent_post.blank?
         errors.add(:parent_id, "must exist")
         return false
       end
       errors.add(:parent_id, "cannot be set to the post being flagged") if parent_post.id == post.id
-    when 'uploading_guidelines'
+    when "uploading_guidelines"
       errors.add(:reason, "cannot be used. The post is grandfathered") unless post.flaggable_for_guidelines?
     else
       errors.add(:reason, "is not one of the available choices") unless MAPPED_REASONS.key?(reason_name)
@@ -178,12 +188,13 @@ class PostFlag < ApplicationRecord
       errors.add(:note, "is required for the selected reason")
     end
   end
+  # #endregion Validators
 
   def update_reason
     case reason_name
-    when 'deletion'
+    when "deletion"
       # NOP
-    when 'inferior'
+    when "inferior"
       return unless parent_post
       old_parent_id = post.parent_id
       post.update_column(:parent_id, parent_post.id)
@@ -208,10 +219,10 @@ class PostFlag < ApplicationRecord
 
   def parent_post
     @parent_post ||= begin
-                       Post.where('id = ?', parent_id).first
-                     rescue
-                       nil
-                     end
+      Post.where("id = ?", parent_id).first
+    rescue
+      nil
+    end
   end
 
   def create_post_event
